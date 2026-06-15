@@ -5,7 +5,7 @@ repository.
 
 > **Always edit `AGENTS.md`, never `CLAUDE.md`.** `CLAUDE.md` is an intentional symlink to `AGENTS.md` so a single
 > instruction file serves Claude Code (which looks for `CLAUDE.md`) and other agents (which look for `AGENTS.md`)
-> without drift. Writing through the symlink risks clobbering it and splitting the two names into separate files — edit 
+> without drift. Writing through the symlink risks clobbering it and splitting the two names into separate files — edit
 > the real target, `AGENTS.md`, and the symlink follows automatically.
 
 ## What this repository is

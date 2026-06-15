@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- best-practices-php — opinionated modern-PHP style guide targeting PHP 8.5 (strict_types, `final readonly` value
+  objects, backed enums, `match`, exceptions named after the problem, constructor DI, PHPStan level max), with 10
+  reference files.
+- best-practices-python — opinionated Pythonic style guide targeting Python 3.14 (type-hints-everywhere with modern
+  syntax, frozen dataclasses, Protocols, the enum family, EAFP, deferred annotations, uv + Ruff toolchain), with 9
+  reference files.
+- best-practices-rust — opinionated idiomatic-Rust style guide targeting Rust 1.96 / edition 2024 (illegal states
+  unrepresentable, borrow-by-default, `Result`/`?`, `thiserror`/`anyhow`, small traits + generics, clippy-clean,
+  scoped `unsafe`), with 10 reference files.
+
 ### Changed
 
 ### Deprecated
