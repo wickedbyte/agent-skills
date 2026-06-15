@@ -1,2 +1,3 @@
-# agent-skills
-Collection of open agent skills for for AI coding agents
+# WickedByte Agent Skills
+
+Collection of open agent skills for AI coding agents
