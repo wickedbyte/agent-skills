@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - best-practices-rust — opinionated idiomatic-Rust style guide targeting Rust 1.96 / edition 2024 (illegal states
   unrepresentable, borrow-by-default, `Result`/`?`, `thiserror`/`anyhow`, small traits + generics, clippy-clean,
   scoped `unsafe`), with 10 reference files.
+- go-gin-api — task skill for building well-structured, thoroughly tested REST/RPC HTTP APIs in idiomatic Go with Gin
+  from an OpenAPI description (domain/store/httpapi layering, dependency selection with `@latest`/`tool` directives,
+  Gin routing incl. resource-action RPC colon dispatch, strict request parsing + JSON error envelope, OAuth 2.0
+  resource-server JWT/JWKS auth, pgx/sqlc/goose persistence with transactions + optimistic concurrency, SSE over
+  `LISTEN/NOTIFY`, graceful shutdown, and OpenAPI route-coverage + schema-fuzz contract testing), with 7 reference
+  files.
 - rust-api-design — task skill for building well-structured, thoroughly tested REST/RPC HTTP APIs in idiomatic Rust
   (Axum 0.8+, Tokio, sqlx 0.8+), covering the cross-cutting skeleton so only the API's own business logic is left to
   write: crate layout and inward layering, dependency stack, routing incl. resource-action `{id}:command` RPC,
