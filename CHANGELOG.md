@@ -18,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - best-practices-rust — opinionated idiomatic-Rust style guide targeting Rust 1.96 / edition 2024 (illegal states
   unrepresentable, borrow-by-default, `Result`/`?`, `thiserror`/`anyhow`, small traits + generics, clippy-clean,
   scoped `unsafe`), with 10 reference files.
+- rust-api-design — task skill for building well-structured, thoroughly tested REST/RPC HTTP APIs in idiomatic Rust
+  (Axum 0.8+, Tokio, sqlx 0.8+), covering the cross-cutting skeleton so only the API's own business logic is left to
+  write: crate layout and inward layering, dependency stack, routing incl. resource-action `{id}:command` RPC,
+  strict serde DTOs and parsing, the single `AppError`/`IntoResponse` envelope, transactional sqlx persistence with
+  optimistic concurrency, OAuth 2.0 / OIDC bearer-token validation, SSE via `LISTEN/NOTIFY`, OpenAPI contract
+  testing, `oneshot` + `#[sqlx::test]` integration tests and Schemathesis, and the multi-stage Dockerfile. Pairs
+  with best-practices-rust; pins no crate versions. With 11 reference files.
 
 ### Changed
 
