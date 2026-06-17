@@ -119,7 +119,9 @@ checks. Pin `validation.algorithms` — leaving it open invites algorithm-confus
 
 ## Wiring the middleware gate
 
-Apply the gate to the protected router only (meta endpoints stay open — see `routing-and-rpc.md`):
+Apply the gate to the protected router only. The open set is **`/readyz`, `/livez`, `/openapi.json`**; the detailed
+`/healthz` report is part of the protected router, so it needs a token when auth is on (see `routing-and-rpc.md` and
+`observability-deployment.md`):
 
 ```rust
 async fn require_auth(
@@ -130,7 +132,7 @@ async fn require_auth(
 }
 ```
 
-`AppError::Unauthorized` renders 401 **with** a `WWW-Authenticate: Bearer` header (see `error-handling.md`).
+`AppError::Unauthorized` renders 401 **with** a `WWW-Authenticate: Bearer` header (see `errors.md`).
 
 ## Config + the toggle
 
@@ -181,5 +183,5 @@ a scope failure to **403 forbidden** (distinct from 401 — the caller _is_ auth
 
 Because the validator takes a `JwkSet`/keys directly, tests mint a token with a local key and feed the matching JWKS
 — no network, fully deterministic. Cover: valid token → 200; missing token → 401; bad signature / wrong `kid` /
-expired / wrong `aud` → 401; insufficient scope → 403; and that meta routes are reachable with no token. See
-`testing.md`.
+expired / wrong `aud` → 401; insufficient scope → 403; that the open probes (`/readyz`, `/livez`, `/openapi.json`)
+are reachable with no token; and that the gated `/healthz` requires one when auth is on. See `testing.md`.

@@ -1,16 +1,13 @@
 ---
 name: api-design-typescript-nestjs
 description: >-
-    Use when building, structuring, or testing a REST or RPC HTTP API in TypeScript with NestJS — especially when
-    implementing a service from an OpenAPI 3.x description, or scaffolding controllers, modules, providers, DTOs,
-    pipes, guards, interceptors, exception filters, or `@Sse()` streams. Applies whenever the task involves
-    `@nestjs/*` packages, a Nest project, the Fastify or Express adapter, resource-action RPC routes
-    (`POST /resource/{id}:command`), Zod or class-validator request validation, OAuth 2.0 / OIDC bearer-token auth,
-    OpenAPI contract-conformance testing, Postgres-backed persistence, or Server-Sent Events. Triggers for: deriving
-    code layout and dependencies from an OpenAPI spec, idiomatic strict-TypeScript Nest structure, the colon-command
-    routing pattern, the request-validation boundary, a single error envelope, command/event-sourced service layers,
-    `LISTEN/NOTIFY` SSE, and asserting the emitted OpenAPI equals the canonical contract. Builds on
-    best-practices-typescript. Use this even when the user does not say "NestJS best practices".
+    Use when building, structuring, or testing a REST or RPC HTTP API in TypeScript with NestJS — implementing an
+    OpenAPI 3.x contract, or scaffolding controllers, modules, providers, DTOs, pipes, guards, filters, or `@Sse()`
+    streams. Covers resource-action RPC routes (`POST /resource/{id}:command`), Zod (or class-validator) request
+    validation, a single error envelope, command/event-sourced service layers with optimistic concurrency, OAuth 2.0 /
+    OIDC bearer auth, Postgres persistence, Server-Sent Events (SSE), and asserting emitted OpenAPI ≡ canonical. Triggers on
+    `@nestjs/*` packages, the Fastify/Express adapter, or a Nest project — use it even when the user does not say
+    "NestJS best practices". Builds on `best-practices-typescript`.
 license: https://github.com/wickedbyte/agent-skills/blob/main/LICENSE
 ---
 
@@ -62,6 +59,26 @@ Use it for any of:
 Do not use it for: front-end React/Next work (use the React/Next skills), non-Nest Node frameworks (Express-only,
 Fastify-only, Hono), or pure TypeScript questions with no HTTP/Nest dimension (use `best-practices-typescript`).
 
+## Adopt, Don't Impose — These Are Greenfield Defaults
+
+The stack and structure below are the blessed starting point for a **new** service. In an existing
+codebase they yield to what the project already does — read the repo first and conform to it. Imposing
+this skill's defaults on a working project is a failure mode, not thoroughness.
+
+- **Persistence is a default, not a mandate.** If the project already has a datastore — SQLite, MySQL,
+  MongoDB, a hosted API, anything — use it. Do **not** introduce Postgres alongside it. The persistence
+  guidance here applies only when there is no datastore yet. The architecture (a pure core behind a store
+  seam) holds regardless of engine; the engine choice is the project's, not the skill's.
+- **Structure is a target, not a teardown.** The layering (pure domain core ← store ← HTTP edge) is the
+  default for new work and a direction to refactor *toward*, but adapt it to the directory conventions the
+  project already uses. Do not restructure a working codebase to match the diagrams here.
+- **Run the project's toolchain, not your own.** Detect and use the project's existing package manager and
+  task runner. Detect the package manager from the lockfile and use it — `npm`/`yarn`/`bun`/`pnpm`
+  (`package-lock.json`/`yarn.lock`/`bun.lockb`/`pnpm-lock.yaml`). `pnpm` is only the greenfield default;
+  never force a project off its manager. If the project runs its tooling through `docker` / `docker compose` or a custom
+  `Makefile`/script/task runner, invoke the tools that way instead of calling them directly. The named
+  tools below are greenfield defaults — never a reason to migrate a project off what it already uses.
+
 ## Workflow — from an OpenAPI spec to a passing service
 
 Build in this order. Each step has a gate (`format → lint → typecheck → test`); do not advance until it is green. This
@@ -73,20 +90,23 @@ is the same discipline whether you drive it by hand or dispatch steps to subagen
    around.
 2. **Scaffold + toolchain.** Project layout (`references/project-structure.md`), dependencies pulled in at their
    **latest** versions (`references/toolchain.md`), strict `tsconfig`, ESLint flat config, Prettier, Vitest, a
-   `Makefile`/scripts gate, and a `Dockerfile` + `compose.yaml` with the service's own Postgres. Prove `GET /healthz`
-   returns 200.
+   `Makefile`/scripts gate, and a `Dockerfile` + `compose.yaml` with the service's own Postgres
+   (`references/observability-deployment.md`). Prove `GET /readyz` returns 200.
 3. **Persistence + migrations.** Versioned migrations for every table/index/constraint; a typed query layer; a
    migrate-on-boot module (`references/persistence.md`).
 4. **Domain core, test-first.** The pure functions/types that encode the rules — no Nest, no IO. Write the failing test
    from each invariant, then implement (`references/domain-core.md`).
-5. **The boundary: routing + validation + errors.** Controllers (REST then the colon-command RPC dispatcher), one
+5. **Confirm the API style (see SKILL.md).** Decide REST / RPC / mixed / split before wiring routes — follow the
+   contract if it encodes one, otherwise ask the user (`references/routing-and-rpc.md`).
+6. **The boundary: routing + validation + errors.** Controllers (REST then the colon-command RPC dispatcher), one
    validation schema per request, and the global exception filter that maps every error to the envelope
    (`references/routing-and-rpc.md`, `references/validation.md`, `references/errors.md`).
-6. **Streaming.** `@Sse()` fed by a `LISTEN/NOTIFY` hub, with `Last-Event-ID` resume (`references/sse.md`).
-7. **Auth scaffolding.** An OIDC resource-server guard gated by `AUTH_REQUIRED`, default off (`references/auth-oauth2.md`).
-8. **OpenAPI + contract test.** Serve `/openapi.json`; assert emitted ≡ canonical; run the external fuzzer
+7. **Streaming.** `@Sse()` fed by a `LISTEN/NOTIFY` hub for the PoC tier (a GRIP proxy at scale), with `Last-Event-ID`
+   resume and a mandatory 30-second keep-alive (`references/sse.md`).
+8. **Auth scaffolding.** An OIDC resource-server guard gated by `AUTH_REQUIRED`, default off (`references/auth-oauth2.md`).
+9. **OpenAPI + contract test.** Serve `/openapi.json`; assert emitted ≡ canonical; run the external fuzzer
    (`references/openapi-contract.md`).
-9. **Seed, README, full gate, conformance.** Idempotent seed, docs, the whole gate green, fuzzer passing.
+10. **Seed, README, full gate, conformance.** Idempotent seed, docs, the whole gate green, fuzzer passing.
 
 ## Core Defaults — apply unless the task gives a specific reason not to
 
@@ -231,8 +251,9 @@ See `references/errors.md`.
 ### 8. Auth is a guard, gated by config, default off
 
 Ship the OAuth 2.0 / OIDC **resource-server** scaffolding from day one but keep it inert: a global guard that returns
-`true` when `AUTH_REQUIRED` is false, and otherwise verifies a bearer JWT against the issuer's JWKS with `jose`. Meta
-endpoints (`/healthz`, `/readyz`, `/openapi.json`) are always open. See `references/auth-oauth2.md`.
+`true` when `AUTH_REQUIRED` is false, and otherwise verifies a bearer JWT against the issuer's JWKS with `jose`. The
+open meta set is `/readyz`, `/livez`, and `/openapi.json`; **`/healthz` is gated** (a richer report behind auth — DB
+ping + build/version). See `references/auth-oauth2.md`.
 
 ### 9. Configuration is validated env, injected by token
 
@@ -257,14 +278,49 @@ the invariant, then implement. Do **not** unit-test logging. See `references/tes
 ### 12. Pull in latest versions; never pin to stale ones
 
 Do not copy version numbers from this skill or from any example. For each dependency, install the **current** release
-(`pnpm add <pkg>@latest`), read its changelog/migration notes, and verify it against the live API — the ecosystem moves
+through the project's package manager (the lockfile decides; `pnpm add <pkg>@latest` is the greenfield default), read
+its changelog/migration notes, and verify it against the live API — the ecosystem moves
 fast and majors change defaults (ESM-only packages, Zod 4, Vitest's transformer, TS strictness). Never downgrade a core
 dependency (language, framework, test runner) to accommodate an outdated library. See `references/toolchain.md`.
+
+## Decide the API Style First — Confirm With the User
+
+"REST with resource-action commands" is this skill's default, but it is not the only valid convention, and
+the choice shapes every path. Before writing routes, confirm which style the API follows — if the OpenAPI
+contract already encodes one, follow it; if you are greenfield or it is ambiguous, **ask the user rather
+than assume**:
+
+1. **Pure REST** — only resources and the uniform HTTP verbs; no action endpoints. State changes are
+   modeled as resource mutations (`PATCH /users/{id}`).
+2. **Pure RPC** — every operation is a named procedure (`POST /resetUserPassword`); resources are secondary
+   or absent. (gRPC/Connect or JSON-RPC live here. If the user wants gRPC specifically, this skill's
+   HTTP/REST machinery does not apply — say so.)
+3. **Mixed: resources + actions on one tree** — REST resources plus resource-scoped commands as a sub-path.
+   The colon form `POST /users/{id}:resetPassword` (Google AIP-136) is one spelling; a sub-resource path
+   `POST /users/{id}/reset-password` is another. **This is the skill's default**, and the dispatcher below
+   implements it.
+4. **Split REST + RPC trees** — REST under one prefix and procedures under another, e.g. `/rest/users/{id}`
+   and `/rpc/reset-user-password`.
+
+Styles 2 and 4 reuse the same `parse → delegate → map` handler shape as the default; only the routing
+layout changes. Pick one convention for the whole surface and keep it consistent.
+
+## Version With Media Types or Headers — Never the URL Path
+
+Do not put the version in the path (`/api/v1/users`, `/rest/v2/...`). URL-path versioning forks resource
+identifiers, breaks caching and hypermedia links, and couples every client to a version string in every
+URL. Prefer **media-type (content-negotiation) versioning** — `Accept: application/vnd.acme.user.v2+json`,
+with the response echoing the chosen `Content-Type` — or, as a lighter option, a dedicated version header
+(`Acme-Version: 2024-11-01`, date- or integer-based). Default to **not versioning at all** until a breaking
+change forces it: evolve compatibly (add optional fields; never repurpose or remove existing ones) for as
+long as you can, and version only the representations that actually break.
 
 ## Dependency Set (resolve each to its latest release)
 
 A typical, well-defended NestJS API pulls in roughly this set. **Names and roles are the durable part — versions are
-not.** Run `pnpm add <pkg>@latest` (or `-D`) and verify.
+not.** Run `<pkg>@latest` through the project's package manager (the lockfile decides:
+`package-lock.json`/`yarn.lock`/`bun.lockb`/`pnpm-lock.yaml`; `pnpm` is the greenfield default) — e.g.
+`pnpm add <pkg>@latest` (or `-D`) — and verify.
 
 | Concern             | Package(s)                                                                         | Role                                                          |
 | ------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------- |
@@ -272,7 +328,7 @@ not.** Run `pnpm add <pkg>@latest` (or `-D`) and verify.
 | Reflection          | `reflect-metadata`                                                                 | Decorator metadata for DI (import once in `main.ts`)          |
 | Validation          | `zod`                                                                              | One schema → runtime check + static type at the boundary      |
 | DB driver + queries | `pg` + `kysely`                                                                    | Postgres client + typed SQL builder (no ORM identity map)     |
-| Streaming           | `rxjs`                                                                             | `Observable` feed for `@Sse()`                                |
+| Streaming           | `rxjs` (+ a GRIP proxy — Pushpin / Fastly Fanout — at scale)                        | `Observable` feed for `@Sse()` (PoC tier); proxy holds connections in production |
 | Auth                | `jose`                                                                             | JWKS fetch + JWT verify in the guard                          |
 | IDs                 | `ulidx`                                                                            | Sortable, prefixed, opaque IDs                                |
 | Logging             | `nestjs-pino` + `pino`                                                             | Structured JSON logs to stdout                                |
@@ -290,6 +346,7 @@ across those choices; `references/toolchain.md` covers the trade-offs.
 | Situation                                          | Default choice                                                                   |
 | -------------------------------------------------- | -------------------------------------------------------------------------------- |
 | HTTP adapter                                       | Fastify (`@nestjs/platform-fastify`)                                             |
+| Which routing convention to use                    | Confirm REST / RPC / mixed / split with the user; default is mixed (resource + colon actions) |
 | Request validation                                 | Zod `z.strictObject` via a `ZodValidationPipe`                                   |
 | `POST /res/{id}:command` routing                   | One `@Post(":id")` catch route + split-on-last-colon dispatch                    |
 | Where domain rules live                            | Pure `domain/` functions — never import `@nestjs/*`                              |
@@ -297,8 +354,10 @@ across those choices; `references/toolchain.md` covers the trade-offs.
 | Concurrency / lost-update protection               | `UNIQUE (stream_id, version)` → 409 on stale append                              |
 | Read-your-writes after a command                   | Update projection in the **same transaction** as the append                      |
 | Date-only field (`YYYY-MM-DD`)                     | Keep as a string; override `pg` type parser `1082` to return raw text            |
-| SSE transport                                      | Postgres `LISTEN/NOTIFY` → RxJS `Subject` → `@Sse()`; resume via `Last-Event-ID` |
+| Live updates to clients                            | SSE; in-process `LISTEN/NOTIFY` for PoC/<100 conns, a GRIP proxy (Pushpin/Fastly Fanout) for production; 30s keep-alive mandatory |
+| SSE transport (PoC tier)                           | Postgres `LISTEN/NOTIFY` → RxJS `Subject` → `@Sse()`; resume via `Last-Event-ID` |
 | Auth                                               | OIDC resource-server guard with `jose`, gated by `AUTH_REQUIRED` (default off)   |
+| Meta endpoints open without a token                | `/readyz`, `/livez`, `/openapi.json` open; `/healthz` is gated behind auth       |
 | OpenAPI doc when the contract is externally frozen | Embed canonical + serve verbatim + drift check                                   |
 | OpenAPI doc when you own the contract              | Generate from schemas (`@nestjs/swagger`) and assert ≡                           |
 | Testing the store / migrations                     | Real Postgres via Testcontainers, not a mock                                     |
@@ -313,9 +372,9 @@ Read the relevant file when SKILL.md leaves a judgment call open:
 - `references/project-structure.md` — Directory layout, one-module-per-resource, the Nest-free `domain/` seam, where
   controllers/services/reads/serializers/DTOs go, global vs feature modules, DI tokens.
 - `references/toolchain.md` — The dependency set and how to resolve latest, strict `tsconfig` (ESM/`nodenext`), ESLint
-  flat config that bans `any`, Prettier, Vitest + `unplugin-swc` decorator metadata, `pnpm`, the `Makefile` gate,
-  `Dockerfile` + `compose.yaml`. Alternatives (class-validator, Drizzle/Prisma, Express).
-- `references/bootstrap-and-config.md` — `main.ts`, Fastify adapter options, pino logging, graceful shutdown, the
+  flat config that bans `any`, Prettier, Vitest + `unplugin-swc` decorator metadata, `pnpm`, the `Makefile` gate.
+  Alternatives (class-validator, Drizzle/Prisma, Express).
+- `references/bootstrap-and-config.md` — `main.ts`, Fastify adapter options, graceful shutdown, the
   Zod-validated `AppConfig` injected by token, wiring global filter/guard via `APP_FILTER`/`APP_GUARD`.
 - `references/routing-and-rpc.md` — Controllers, REST resources, the colon-command dispatcher in depth, parsing path
   params without the suffix, status codes, `@HttpCode`, list/query endpoints, the routing unit test.
@@ -325,17 +384,22 @@ Read the relevant file when SKILL.md leaves a judgment call open:
   `decide`/`apply`/`fold`, exhaustiveness via `never`, guards and named errors, injecting the clock, view predicates.
 - `references/persistence.md` — `pg` + Kysely setup, the date-type-parser gotcha, the event store (`append` + projections
   in one transaction), optimistic concurrency, migrations + migrate-on-boot, projection rebuild, the Valkey lock option.
-- `references/sse.md` — `@Sse()` + RxJS, the `LISTEN/NOTIFY` hub on a dedicated connection, per-connection backfill +
-  live merge + dedup, `Last-Event-ID` resume, event-name mapping, reconnect, shutdown.
+- `references/sse.md` — the PoC-vs-GRIP-proxy scaling decision and the mandatory 30s keep-alive, `@Sse()` + RxJS, the
+  `LISTEN/NOTIFY` hub on a dedicated connection (PoC tier), per-connection backfill + live merge + dedup, `Last-Event-ID`
+  resume, event-name mapping, reconnect, shutdown, and publishing to a Pushpin/Fanout proxy in production.
 - `references/errors.md` — The error envelope shape, the global `@Catch()` filter, mapping each domain error → status +
   code, validation-error field/reason extraction, never leaking stack traces, the 500 fallback.
 - `references/auth-oauth2.md` — The OAuth 2.0 / OIDC resource-server model, the `jose` `createRemoteJWKSet` + `jwtVerify`
-  guard, `AUTH_REQUIRED` gating, always-open meta paths, issuer/audience checks, the security scheme in the contract,
+  guard, `AUTH_REQUIRED` gating, the open meta paths (`/readyz`, `/livez`, `/openapi.json`) with `/healthz` gated,
+  issuer/audience checks, the security scheme in the contract,
   scope/claim checks, testing with a local JWKS.
 - `references/openapi-contract.md` — Emit-vs-embed strategies, serving `/openapi.json`, the emitted ≡ canonical test,
   normalizing for comparison, and running the external Schemathesis conformance fuzzer against the container.
 - `references/testing.md` — The four layers, Vitest + `unplugin-swc` config, Testcontainers for real Postgres, the
   `createTestApp` helper, `supertest` patterns, table-driven invariant tests, testing SSE, what not to test.
+- `references/observability-deployment.md` — Structured pino logging and `authorization` redaction, the two-probe
+  policy (open shallow `/readyz` + `/livez`, gated rich `/healthz`), the multi-stage `Dockerfile`, and the
+  `compose.yaml` with the service's own Postgres.
 
 ## Common Mistakes (and the fix)
 
@@ -355,6 +419,9 @@ Read the relevant file when SKILL.md leaves a judgment call open:
 | Mocking Postgres in store/migration tests                                      | Use a real Postgres via Testcontainers; mocks hide constraint/concurrency bugs               |
 | Leaving `AUTH_REQUIRED` un-scaffolded "until later"                            | Ship the inert guard now; flipping the env is the only change needed to enforce              |
 | Forgetting `reflect-metadata` / SWC decorator metadata in tests                | Import `reflect-metadata` in `main.ts`; configure `unplugin-swc` so Vitest emits DI metadata |
+| Version in the URL path (`/api/v1/...`)                                        | Version via media type (`Accept: application/vnd...+json`) or a version header; never the path |
+| Fanning out SSE from the app at scale                                          | Front it with a GRIP proxy (Pushpin/Fastly Fanout); the app publishes, the proxy holds connections |
+| Optional/absent SSE keep-alive                                                 | Mandatory heartbeat every 30s                                                                |
 
 ## Pre-Commit Self-Check
 
@@ -368,7 +435,10 @@ Before saying "done" on a NestJS API change, verify:
 - [ ] Every error path leaves through the single global exception filter and the contract's error envelope.
 - [ ] Command writes append events and update projections in **one** transaction; stale versions yield 409.
 - [ ] Discriminated `switch`es over commands/events are exhaustive with a `never` default.
-- [ ] The auth guard is wired, gated by `AUTH_REQUIRED`, and leaves `/healthz` `/readyz` `/openapi.json` open.
+- [ ] The auth guard is wired, gated by `AUTH_REQUIRED`, leaves `/readyz` `/livez` `/openapi.json` open, and **gates
+      `/healthz`** behind auth.
+- [ ] Every SSE stream emits a keep-alive heartbeat at least every 30s; production fan-out goes through a GRIP proxy,
+      not the app process.
 - [ ] `GET /openapi.json` is served and an in-repo test asserts it equals the canonical contract.
 - [ ] Store/migration tests run against a real Postgres; HTTP tests run against the booted app.
 - [ ] Dependencies were resolved to their **latest** releases and verified — no stale pins copied from examples.

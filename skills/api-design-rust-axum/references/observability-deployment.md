@@ -1,7 +1,7 @@
-# Observability, Config & Deployment
+# Observability & Deployment
 
-The cross-cutting concerns that make an API operable: structured logs, health probes, typed configuration, and a
-small, secure container image.
+The cross-cutting concerns that make an API operable: structured logs, health probes, and a small, secure container
+image. (Typed env `Config` that fails fast at boot lives in `bootstrap-and-config.md`.)
 
 ## Structured logging with `tracing`
 
@@ -31,54 +31,55 @@ Rules:
 - **Never log secrets or tokens.** Don't log `Authorization` headers, JWTs, or full request bodies that may carry
   PII. Log ids and outcomes, not credentials.
 - **Log the cause of a 500, expose nothing.** The `Internal` error path logs `error = %cause` and returns the
-  generic envelope (see `error-handling.md`).
+  generic envelope (see `errors.md`).
 - **Don't unit-test logging** — it isn't a behavioral contract.
 
 ## Health & readiness probes
 
-Two distinct endpoints, both always open (no auth):
+**Two probes, two audiences.** `/readyz` answers "can I serve traffic right now?" for the load balancer and
+readiness gate — a shallow dependency check (a `SELECT 1`-class ping), 200 or 503, and it stays **open**
+(the balancer carries no token). `/healthz` answers "am I healthy?" with a richer report — component and
+dependency status, build/version — meant for operators and dashboards. Because that detail leaks internal
+topology, **`/healthz` sits behind authentication**, not in the always-open set. Keep `/openapi.json` open.
+If an orchestrator needs a liveness check, point it at an open, bodyless `/livez` (or reuse `/readyz`) that
+returns 200 — never expose the detailed `/healthz` publicly.
 
-- **`/healthz` (liveness)** — the process is up. Return 200 unconditionally; a failure here tells an orchestrator to
-  restart the pod.
-- **`/readyz` (readiness)** — the process can serve traffic, i.e. dependencies are reachable. Check the DB; 503 if
-  not. A failure here tells the load balancer to stop routing, without restarting.
+So there are three probe routes: open `/readyz` and `/livez` plus the gated `/healthz` (wired into the protected
+router — see `routing-and-rpc.md`).
 
 ```rust
-async fn healthz() -> StatusCode { StatusCode::OK }
+use axum::Json;
+use serde_json::json;
 
+// Open, bodyless liveness — the process is up. A failure tells the orchestrator to restart the pod.
+async fn livez() -> StatusCode { StatusCode::OK }
+
+// Open, shallow readiness — can we serve traffic? Ping the DB; 503 if not, so the load balancer
+// stops routing here without restarting the pod.
 async fn readyz(State(state): State<AppState>) -> StatusCode {
     match sqlx::query("SELECT 1").execute(state.store.pool()).await {
         Ok(_) => StatusCode::OK,
         Err(_) => StatusCode::SERVICE_UNAVAILABLE,
     }
 }
-```
 
-Keep `/openapi.json` open too. Everything else sits behind the auth gate.
-
-## Typed configuration from the environment
-
-Read config from env into a typed struct **at boot**, and fail fast with a clear message if something required is
-missing or malformed — a misconfigured service should refuse to start, not 500 later.
-
-```rust
-pub struct Config {
-    pub database_url: String,
-    pub port: u16,
-}
-
-impl Config {
-    pub fn from_env() -> Self {
-        let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-        let port = std::env::var("PORT").ok().and_then(|v| v.parse().ok()).unwrap_or(8080);
-        Self { database_url, port }
-    }
+// Gated, detailed report — dependency status + build/version, for operators. Behind the auth gate
+// because it exposes internal topology.
+async fn healthz(State(state): State<AppState>) -> (StatusCode, Json<serde_json::Value>) {
+    let db_ok = sqlx::query("SELECT 1").execute(state.store.pool()).await.is_ok();
+    let status = if db_ok { StatusCode::OK } else { StatusCode::SERVICE_UNAVAILABLE };
+    let body = json!({
+        "status": if db_ok { "ok" } else { "degraded" },
+        "version": env!("CARGO_PKG_VERSION"),
+        "build": option_env!("GIT_SHA").unwrap_or("unknown"),
+        "checks": { "database": if db_ok { "up" } else { "down" } },
+    });
+    (status, Json(body))
 }
 ```
 
-`expect` in `main`/config is the right tool: a clear panic at startup beats a service that boots into a broken state.
-This is the one place the request-path "never panic" rule does not apply. (For larger config surfaces, `serde` +
-`envy`, or `figment`, deserialize env into the struct with validation.)
+The open set is therefore **`/readyz`, `/livez`, `/openapi.json`**; `/healthz` and everything else sit behind the
+auth gate.
 
 ## The production Dockerfile (multi-stage, distroless)
 
@@ -114,7 +115,7 @@ ENTRYPOINT ["/myapi"]
 
 Match the runtime base to the build target: a glibc build (`*-unknown-linux-gnu`, the default) runs on
 `distroless/cc`; a fully static `*-musl` build can run on `distroless/static` or `scratch`. The release profile
-(`lto`, `codegen-units = 1`, `strip`) is in `dependencies.md`.
+(`lto`, `codegen-units = 1`, `strip`) is in `toolchain.md`.
 
 ## `compose.yaml` for local + CI
 

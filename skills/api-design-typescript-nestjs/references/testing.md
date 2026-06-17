@@ -170,8 +170,8 @@ describe("task commands (I6–I10) + colon dispatch", () => {
 ```
 
 Assert **both** the status and `body.error.code` for every error path (422 / 404 / 409×both codes). Add an auth spec
-that toggles `AUTH_REQUIRED=true` and checks 401 (no token) / 200 (valid token) / 200 on `/healthz` (see
-`references/auth-oauth2.md`).
+that toggles `AUTH_REQUIRED=true` and checks 401 (no token) / 200 (valid token) / 200 on the open `/readyz` / 401 on
+the gated `/healthz` with no token (see `references/auth-oauth2.md`).
 
 ## Testing SSE
 

@@ -1,9 +1,25 @@
 # Server-Sent Events over Postgres LISTEN/NOTIFY
 
+**Scaling caveat — read before you build.** The in-process `LISTEN/NOTIFY` fan-out shown below holds one
+long-lived connection per subscriber inside the app process. That is fine for a proof of concept or a
+low-concurrency internal tool — roughly **under 100 concurrent streams on a single instance** — but it does
+**not** scale: open connections pin memory and file descriptors to specific instances, every deploy drops
+every stream, and horizontal scaling multiplies the `LISTEN` load on Postgres. **For production, or anything
+user-facing at scale, do not fan out from the app.** Put a GRIP-capable realtime proxy in front — **Pushpin**
+(self-hosted, open source) or **Fastly Fanout** — and have the app *publish* events to it while holding no
+long-lived client connections itself. The proxy owns the open connections, so the service scales and deploys
+like any stateless app. Treat the design below as the PoC tier and the proxy as the blessed production path.
+
+**Keep-alives are mandatory.** Every stream emits a heartbeat comment (`: keep-alive\n\n`) at least every
+**30 seconds**, whether the app or the proxy owns the connection. Idle SSE connections are silently dropped
+by proxies and load balancers otherwise, and the heartbeat is how a dead client is detected. With a GRIP
+proxy, configure its keep-alive; with the in-process design, the handler sends it on a 30-second timer.
+
 When the contract has an event-stream endpoint (`GET /events` returning `text/event-stream`), implement it with Postgres
 `LISTEN/NOTIFY` as the broker — no extra message bus. One process-wide goroutine holds a dedicated `LISTEN` connection
 and fans events out to every connected client over channels; each connection backfills missed events from a cursor, then
-streams live.
+streams live. **This in-process design is the PoC / under-100-concurrent-streams tier** — see the scaling caveat above
+and the GRIP-proxy production path at the end of this file.
 
 SSE (not WebSockets) is the right tool here: it's one-directional server→client, runs over plain HTTP, and has built-in
 reconnect + resume via the `Last-Event-ID` header. Use sortable IDs (ULIDs) as the cursor so "events after X" is a
@@ -146,6 +162,11 @@ func (a *App) streamEvents(c *gin.Context) {
         }
     }
 
+    // Mandatory heartbeat: a ": keep-alive" comment at least every 30s keeps proxies
+    // and load balancers from silently dropping an idle stream, and surfaces dead clients.
+    keepAlive := time.NewTicker(30 * time.Second)
+    defer keepAlive.Stop()
+
     for {
         select {
         case ev, ok := <-sub:
@@ -156,6 +177,9 @@ func (a *App) streamEvents(c *gin.Context) {
                 continue
             }
             writeSSEFrame(w, ev)
+            w.Flush()
+        case <-keepAlive.C: // mandatory 30s heartbeat
+            _, _ = io.WriteString(w, ": keep-alive\n\n")
             w.Flush()
         case <-ctx.Done(): // client disconnected
             return
@@ -182,3 +206,28 @@ func writeSSEFrame(w io.Writer, ev sseEvent) {
   "already sent" is `ev.ID <= cursor` — no timestamps, no sequence table.
 - **Reconnect resilience**: the hub reconnects its `LISTEN` conn with backoff; clients reconnect automatically and send
   `Last-Event-ID`, so a dropped notification during a blip is recovered from the log on the next connection.
+- **Keep-alive is mandatory, not optional.** The 30-second `: keep-alive` ticker above is required — without it,
+  intermediaries drop idle connections and dead clients go undetected. Never ship the stream without it.
+
+## Production: publish to a GRIP proxy (Pushpin / Fastly Fanout)
+
+The in-process hub above is the PoC tier. For production or anything user-facing at scale, **stop holding connections in
+the app** and front the SSE endpoint with a GRIP-capable realtime proxy — **Pushpin** (self-hosted, open source) or
+**Fastly Fanout** (managed). The proxy owns every long-lived client connection; the app becomes stateless and scales and
+deploys like any other HTTP service.
+
+The mechanism is **GRIP** (Generic Realtime Intermediary Protocol):
+
+- The client's SSE request hits the proxy, which forwards it to your `GET /events` handler. The handler does its
+  backfill, then responds with **GRIP hold instructions** instead of streaming: it sets `Content-Type: text/event-stream`
+  and a `Grip-Hold: stream` header naming a channel (e.g. `Grip-Channel: events`), and returns. The proxy holds the
+  connection open and subscribed to that channel.
+- When an event commits, the app **publishes** it to the proxy's control plane — Pushpin's publish endpoint
+  (`POST http://pushpin:5561/publish/`) or the Fastly Fanout publish API — addressed to the same channel, formatted as
+  an SSE frame. The proxy fans it out to every held connection. The app holds **no** long-lived client connections.
+- Configure the **30-second keep-alive on the proxy** (Pushpin sends a keep-alive comment per channel on a configurable
+  interval; set it to ≤30s) instead of the in-process ticker.
+
+The Postgres event log and `Last-Event-ID` backfill stay exactly as above — only the live fan-out moves from in-process
+channels to the proxy. A full Pushpin config is out of scope here; the load-bearing pieces are the names: **GRIP**,
+`Grip-Hold`, `Grip-Channel`, and the proxy's **publish endpoint**.

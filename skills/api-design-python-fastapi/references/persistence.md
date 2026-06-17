@@ -1,9 +1,12 @@
-# Persistence (async SQLAlchemy + asyncpg) & server-sent events
+# Persistence (async SQLAlchemy + asyncpg)
+
+**Greenfield default.** If the project already has a datastore, use it and skip this — see *Adopt, Don't Impose* in
+SKILL.md.
 
 The persistence layer is async end-to-end: an async engine, async sessions, transactional writes, and optimistic
-concurrency. This reference shows the engine/session setup, the transactional write path, projections, Alembic async
-migrations, and SSE over Postgres `LISTEN/NOTIFY`. The patterns generalize to any FastAPI service; the event-sourcing
-specifics are one concrete instance of "write atomically, then read your writes."
+concurrency. This reference shows the engine/session setup, the transactional write path, projections, and Alembic async
+migrations. The patterns generalize to any FastAPI service; the event-sourcing specifics are one concrete instance of
+"write atomically, then read your writes." Streaming those writes to clients over SSE is covered in `references/sse.md`.
 
 ## Engine and sessions
 
@@ -235,81 +238,3 @@ asyncio.run(_run_async())
 `upgrade head` then `downgrade base` must round-trip cleanly — test it. Prefer explicit raw-SQL `op.execute(...)`
 migrations for an event store; you control exact DDL (constraints, partial indexes, generated columns) that autogenerate
 would miss.
-
-## Server-sent events over `LISTEN/NOTIFY`
-
-A single shared asyncpg connection issues `LISTEN`; on each `NOTIFY` it fans the event id to every subscriber's
-`asyncio.Queue`. Each `EventSourceResponse` backfills from the events table (`WHERE id > :last_seen`) before going live,
-so `Last-Event-ID` resumes exactly after the last delivered event.
-
-```python
-# sse.py
-import asyncio
-from collections.abc import AsyncIterator
-
-import asyncpg
-
-
-class SseHub:
-    def __init__(self, dsn: str) -> None:
-        self._dsn = dsn
-        self._conn: asyncpg.Connection | None = None
-        self._subscribers: set[asyncio.Queue[str]] = set()
-
-    async def start(self) -> None:
-        self._conn = await asyncpg.connect(self._dsn)
-        await self._conn.add_listener("app_events", self._on_notify)
-
-    async def stop(self) -> None:
-        if self._conn is not None:
-            await self._conn.close()
-
-    def _on_notify(self, _conn: object, _pid: int, _channel: str, event_id: str) -> None:
-        for queue in self._subscribers:
-            queue.put_nowait(event_id)          # wake every live subscriber
-
-    async def subscribe(self) -> AsyncIterator[str]:
-        queue: asyncio.Queue[str] = asyncio.Queue()
-        self._subscribers.add(queue)
-        try:
-            while True:
-                yield await queue.get()
-        finally:
-            self._subscribers.discard(queue)    # always clean up on disconnect
-```
-
-```python
-# api/events.py
-from fastapi import APIRouter, Header, Request
-from sse_starlette.sse import EventSourceResponse
-
-router = APIRouter()
-
-
-@router.get("/events")
-async def stream_events(request: Request, last_event_id: str | None = Header(default=None)) -> EventSourceResponse:
-    hub: SseHub = request.app.state.hub
-    store: EventStore = request.app.state.store
-
-    async def gen() -> AsyncIterator[dict[str, str]]:
-        last_seen = last_event_id or ""
-        # 1) backfill everything after Last-Event-ID
-        for event in await store.events_after(last_seen):
-            last_seen = event.id
-            yield {"id": event.id, "event": event.sse_name, "data": event.sse_data}
-        # 2) go live
-        async for event_id in hub.subscribe():
-            if event_id <= last_seen:
-                continue                          # skip anything already backfilled (ULIDs sort lexically)
-            for event in await store.events_after(last_seen):
-                last_seen = event.id
-                yield {"id": event.id, "event": event.sse_name, "data": event.sse_data}
-
-    return EventSourceResponse(gen())
-```
-
-Key points: keep the NOTIFY payload small (send the event **id**, fetch the row in the handler — payloads have a size
-limit); the listener connection lives **outside** the SQLAlchemy pool; and use sortable ids (ULIDs) so `WHERE id >
-:last_seen ORDER BY id` is a correct, index-friendly backfill. Test subscribe → mutate → assert-frame, and
-reconnect-with-`Last-Event-ID` → later-events-only.
-</content>

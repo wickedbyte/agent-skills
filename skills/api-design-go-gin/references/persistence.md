@@ -1,5 +1,7 @@
 # Persistence: pgx + sqlc + goose
 
+**Greenfield default.** If the project already has a datastore, use it and skip this — see *Adopt, Don't Impose* in SKILL.md.
+
 The store is an adapter: it translates domain types to and from Postgres and never leaks `pgx` types or raw SQL errors
 upward. Stack: `pgx/v5` for the driver and pool, `sqlc` to generate type-safe query code from SQL, `goose` for
 versioned migrations.
@@ -156,23 +158,15 @@ You can also match a **specific** constraint (e.g. a slug uniqueness) by checkin
 different constraints to different client errors. Always inspect via `errors.As(&pgErr)` — never substring-match the
 message.
 
-## Keep the domain pure; the store maps both ways
+## The store maps domain types both ways
 
-The flow for a command:
+The pure `domain` core (see `domain-core.md`) emits events from a `Decide(state, cmd, now)` function; the store is what
+persists them and reads them back, owning the translation in both directions:
 
-```
-handler binds DTO → domain.Decide(state, cmd, now) → []Event (pure, no I/O)
-        → store.Commit(...)  // append + project in one tx, NOTIFY, return new state
-        → handler maps to JSON
-```
-
-- `domain` exposes pure functions — `Decide(state, cmd, now) ([]Event, error)` validates the guard and emits events;
-  `Apply(state, event) State` folds. No `pgx`, no `context`, no clock-reading inside (the clock is a parameter). This is
-  where all the real rules and all the unit tests live.
 - `store` owns the `convert.go`/`codec.go` mapping between domain types and the sqlc row/param structs, including
   small helpers for nullable columns (`*string ↔ pgtype.Text`) and for forcing `[]string{}` over `nil`.
 - Centralize any narrowing conversion (e.g. `int → int32` for a Postgres `int4`) in one range-checked helper and
   suppress the `gosec` G115 warning there, once, with a comment — not scattered across call sites.
 
 This separation is what lets you unit-test every business rule with no database, and integration-test the thin store/HTTP
-adapters against a real Postgres (see `testing-and-contract.md`).
+adapters against a real Postgres (see `testing.md`).

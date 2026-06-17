@@ -157,29 +157,5 @@ sets env before the module loads.
 constructor(@Inject(APP_CONFIG) private readonly config: AppConfig) {}
 ```
 
-## Logging
-
-Use `nestjs-pino` for structured JSON to stdout. Configure the level from env, silence it in tests, and let request
-logging come from `pino-http` (wired by `LoggerModule.forRoot`). Log error paths and useful info/debug; **do not
-unit-test logging** — it is observability, not behavior.
-
-```ts
-LoggerModule.forRoot({
-    pinoHttp: {
-        level: process.env.LOG_LEVEL ?? "info",
-        redact: ["req.headers.authorization"], // never log bearer tokens
-    },
-});
-```
-
-Redaction of the `authorization` header is not optional once auth is enabled — bearer tokens must never reach the log
-stream.
-
-## Readiness vs liveness
-
-- `GET /healthz` — **liveness**: returns 200 whenever the process is up. No dependency checks; a slow DB must not make
-  the orchestrator kill a healthy process.
-- `GET /readyz` — **readiness**: returns 200 only when migrations have run and the DB (and any cache) answer; 503
-  otherwise. This is what gates traffic and what `compose` `depends_on … service_healthy` should poll.
-
-Keep both — and `/openapi.json` — outside the auth gate (see `references/auth-oauth2.md`).
+Structured logging (pino setup and redaction) and the probes — the open shallow `/readyz` + bodyless `/livez` and the
+gated rich `/healthz` — live in `references/observability-deployment.md`.

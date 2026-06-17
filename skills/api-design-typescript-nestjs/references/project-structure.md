@@ -1,5 +1,7 @@
 # Project Structure
 
+This layout is the default for new work; adapt to an existing project's conventions rather than restructuring it.
+
 The layout exists to protect one boundary: **the pure domain core must not depend on NestJS, HTTP, or the database.**
 Everything else is arrangement around that seam. A controller is a translator; a service is an orchestrator; the
 domain is the application. Get the directories right and the dependency direction enforces itself.
@@ -58,7 +60,7 @@ src/
         projects/ …                      # same shape
         views/    views.controller.ts    # GET /views/* (reuses task-reads)
         events/   events.controller.ts   # @Sse('events'); event-hub.ts; event-name.ts
-        meta/     health.controller.ts   # /healthz /readyz; openapi.controller.ts
+        meta/     health.controller.ts   # open /readyz /livez (+ gated /healthz); openapi.controller.ts
 
     openapi.document.ts         # the served OpenAPI doc (generated or embedded)
     seed.ts                     # idempotent seed via the command path

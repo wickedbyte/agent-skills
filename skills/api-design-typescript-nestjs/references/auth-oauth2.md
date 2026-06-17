@@ -27,7 +27,7 @@ when auth is on, a valid bearer token is required.
 ```ts
 import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from "jose";
 
-const OPEN_PATHS = new Set(["/healthz", "/readyz", "/openapi.json"]);
+const OPEN_PATHS = new Set(["/readyz", "/livez", "/openapi.json"]);
 
 function bearerToken(header: string | undefined): string | null {
     if (header === undefined) return null;
@@ -99,8 +99,10 @@ What each part defends:
   per-request would defeat the cache. It is `null` when auth is off so boot doesn't require a reachable provider.
 - **`issuer` and `audience` checks.** Verifying the signature is not enough — a valid token from a _different_ audience
   or issuer must be rejected, or you accept tokens minted for another service. Pass them whenever configured.
-- **Meta paths open.** `/healthz`, `/readyz`, `/openapi.json` must answer without a token (probes, doc tooling). Match
-  on the path with the query string stripped.
+- **Meta paths open.** `/readyz`, `/livez`, and `/openapi.json` must answer without a token (probes, doc tooling). Match
+  on the path with the query string stripped. **`/healthz` is deliberately *not* in this set** — it is a gated route
+  whose richer report (DB + build/version) would leak internal topology, so it sits behind the auth gate like any other
+  authenticated endpoint (see `references/observability-deployment.md`).
 - **`UnauthorizedException` → 401.** The global filter renders it through the envelope (`codeForStatus(401)`); a bad or
   missing token never leaks why beyond a generic message.
 
@@ -161,13 +163,13 @@ const token = await new SignJWT({ scope: "tasks:write" })
     .sign(privateKey);
 ```
 
-Assert the 401/200 toggle: with `AUTH_REQUIRED=true`, no token → 401, valid token → 200, and `/healthz` → 200 with no
-token. See `references/testing.md`.
+Assert the 401/200 toggle: with `AUTH_REQUIRED=true`, no token → 401, valid token → 200, `/readyz` (and `/livez`) → 200
+with no token, and `/healthz` → 401 with no token (it is gated, not open). See `references/testing.md`.
 
 ## Don't
 
 - **Don't accept `alg: none` or symmetric keys from the token header.** `jwtVerify` against a JWKS already prevents this;
   don't add a fallback that does.
-- **Don't log the token** (redact the `authorization` header in pino — see `references/bootstrap-and-config.md`).
+- **Don't log the token** (redact the `authorization` header in pino — see `references/observability-deployment.md`).
 - **Don't build an authorization server.** Issuance, refresh, consent screens, and user management belong to the OIDC
   provider; this service only validates.

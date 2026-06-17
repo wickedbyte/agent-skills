@@ -121,7 +121,8 @@ async fn replay_reproduces_projections(pool: PgPool) {
 
 Build the authenticator from a locally-minted key so no network is involved (see `auth-oauth2.md`): mint a JWT with a
 test RSA key, feed the matching JWKS into `Authenticator::from_jwks`, and assert valid → 200, missing/expired/wrong-
-`kid`/wrong-`aud` → 401, insufficient scope → 403, and that meta routes are reachable with no token.
+`kid`/wrong-`aud` → 401, insufficient scope → 403, that the open probes (`/readyz`, `/livez`, `/openapi.json`) are
+reachable with no token, and that the gated `/healthz` is rejected without one when auth is on.
 
 ## 5. SSE tests
 

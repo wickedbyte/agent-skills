@@ -1,5 +1,11 @@
 # Toolchain — Dependencies, Config, and the Gate
 
+**Detect and respect the project's runner first.** In an existing repo, the package manager is whatever the committed
+lockfile says (`package-lock.json` → npm, `yarn.lock` → yarn, `bun.lockb` → bun, `pnpm-lock.yaml` → pnpm), and if the
+project drives its tools through `docker compose`, a `Makefile`, or a task runner, invoke them that way. Everything
+below is the **greenfield default** — `pnpm` and a plain `Makefile` for a brand-new service — not a reason to migrate a
+working project off its manager.
+
 The toolchain has one job beyond building the app: **hold the line against TypeScript drift.** The ecosystem tolerates
 `any`, loose configs, and stale pins; an agentic build will drift toward all three unless the gate forbids them. Strict
 `tsconfig`, an ESLint rule that makes `any` an error, and `tsc --noEmit` in CI are the guardrails.
@@ -27,8 +33,11 @@ Why "latest, verified" is not optional here:
 - **Decorator metadata is fragile across transformers.** NestJS DI relies on `emitDecoratorMetadata`. `tsc` does it;
   your test transformer must too (see Vitest below).
 
-Use `pnpm` only (lockfile committed, `--frozen-lockfile` in CI). The NestJS transitive tree is large — that is the cost
-of the DI layering; keep `pnpm audit` in CI and avoid adding more surface than the contract needs.
+Use the project's package manager — the lockfile decides (`package-lock.json`/`yarn.lock`/`bun.lockb`/`pnpm-lock.yaml`);
+`pnpm` is the greenfield default. Whichever it is, commit the lockfile and run the frozen/immutable install in CI
+(`--frozen-lockfile` for pnpm, `npm ci`, `yarn --immutable`, `bun install --frozen-lockfile`). The NestJS transitive
+tree is large — that is the cost of the DI layering; keep an `audit` step in CI and avoid adding more surface than the
+contract needs.
 
 ## `package.json` scripts
 
@@ -166,62 +175,8 @@ up:   ; docker compose up -d --build
 down: ; docker compose down -v
 ```
 
-## Docker + compose (the service owns its Postgres)
-
-A multi-stage `Dockerfile` keeps the runtime image lean; the `compose.yaml` ships the service's **own** Postgres so it
-runs independently and in parallel with other services.
-
-```dockerfile
-# syntax=docker/dockerfile:1
-FROM node:22-slim AS build
-RUN corepack enable
-WORKDIR /app
-COPY package.json pnpm-lock.yaml ./
-RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store pnpm install --frozen-lockfile
-COPY tsconfig*.json ./
-COPY src ./src
-RUN pnpm build && pnpm prune --prod
-
-FROM node:22-slim AS runtime
-ENV NODE_ENV=production
-WORKDIR /app
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/dist ./dist
-COPY package.json ./
-EXPOSE 8080
-USER node
-CMD ["node", "dist/main.js"]
-```
-
-```yaml
-services:
-    api:
-        build: .
-        environment:
-            DATABASE_URL: postgres://app:app@postgres:5432/app
-            AUTH_REQUIRED: "false"
-        ports: ["8080:8080"]
-        depends_on:
-            postgres: { condition: service_healthy }
-        healthcheck:
-            test:
-                [
-                    "CMD",
-                    "node",
-                    "-e",
-                    "fetch('http://localhost:8080/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
-                ]
-            interval: 5s
-            retries: 12
-    postgres:
-        image: postgres:17-alpine
-        environment:
-            { POSTGRES_USER: app, POSTGRES_PASSWORD: app, POSTGRES_DB: app }
-        healthcheck:
-            test: ["CMD-SHELL", "pg_isready -U app -d app"]
-            interval: 3s
-            retries: 10
-```
+The multi-stage `Dockerfile` and the `compose.yaml` (with the service's own Postgres) live in
+`references/observability-deployment.md`.
 
 ## Alternatives and trade-offs
 

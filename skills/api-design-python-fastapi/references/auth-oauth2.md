@@ -111,14 +111,15 @@ def require_auth(request: Request, authorization: str | None = Header(default=No
 ```
 
 ```python
-# main.py — apply to business routers, leave meta open
+# main.py — apply to business routers, leave the open probes open
 gated = [Depends(require_auth)]
 app.include_router(tasks.router, dependencies=gated)
 app.include_router(commands.router, dependencies=gated)
-# /healthz, /readyz, /openapi.json are registered WITHOUT the gate — always reachable
+app.include_router(health.router, dependencies=gated)   # /healthz: richer report, behind the gate
+# /readyz, /livez, /openapi.json are registered WITHOUT the gate — always reachable
 ```
 
-Map the error in the handler bundle (see `validation-and-errors.md`):
+Map the error in the handler bundle (see `errors.md`):
 
 ```python
 @app.exception_handler(UnauthorizedError)
@@ -215,8 +216,8 @@ Don't call the real IdP. Test the gate by injecting a key resolver or overriding
 - **Local tokens:** generate an RSA keypair in the test, sign a JWT with the right `iss`/`aud`/`exp`, and point the
   authenticator at a fixture JWKS (or `app.dependency_overrides[require_auth] = lambda: {"sub": "test"}` for handler
   tests that don't exercise verification).
-- **Meta-always-open:** assert `/healthz`, `/readyz`, `/openapi.json` return 200 even with `auth_required=True` and no
-  token.
+- **Open probes stay open:** assert `/readyz`, `/livez`, `/openapi.json` return 200 even with `auth_required=True` and
+  no token; assert `/healthz` returns 401 in that same configuration (it is gated, not open).
 
 ```python
 async def test_protected_endpoint_rejects_missing_token() -> None:
@@ -227,5 +228,3 @@ async def test_protected_endpoint_rejects_missing_token() -> None:
     assert resp.status_code == 401
     assert resp.json()["error"]["code"] == "unauthorized"
 ```
-
-</content>

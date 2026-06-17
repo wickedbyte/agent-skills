@@ -1,5 +1,7 @@
 # Persistence — Event Store, Projections, Migrations
 
+**Greenfield default.** If the project already has a datastore, use it and skip this — see *Adopt, Don't Impose* in SKILL.md.
+
 The store is the only layer that knows SQL. It maps rows to domain types and back, appends events with optimistic
 concurrency, updates read-model projections **in the same transaction**, and runs versioned migrations. The example is
 event-sourced; a CRUD service keeps the same transactional-write and projection-as-read-model discipline without the

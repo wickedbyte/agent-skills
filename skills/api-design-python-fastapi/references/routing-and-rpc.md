@@ -4,6 +4,29 @@ FastAPI routing is declarative: an `APIRouter` per resource, type-annotated para
 validates, and a Pydantic body model. This reference covers REST routing, parameter parsing, response shaping, and — in
 depth — the resource-action **colon-route** pattern that the contract uses for RPC commands.
 
+## Confirm the API style first
+
+Before wiring routes, settle which convention the surface follows (see SKILL.md "Decide the API Style First" — confirm
+with the user when greenfield or ambiguous). Four options:
+
+1. **Pure REST** — resources and uniform verbs only; no action endpoints (`PATCH /users/{id}`).
+2. **Pure RPC** — every operation is a named procedure (`POST /resetUserPassword`).
+3. **Mixed: resources + actions on one tree** — REST resources plus resource-scoped commands as a sub-path, spelled
+   either as the colon form `POST /users/{id}:resetPassword` (Google AIP-136) or a sub-resource path
+   `POST /users/{id}/reset-password`. **This is the skill's default, and the colon dispatch below implements it.**
+4. **Split REST + RPC trees** — REST under one prefix, procedures under another (`/rest/users/{id}`, `/rpc/...`).
+
+Styles 2 and 4 reuse the same `parse → delegate → map` handler shape shown here; only the route layout changes — keep
+one convention across the whole surface.
+
+### Version with media types or headers, never the path
+
+Do not encode the API version in the path (`/api/v1/users`). Prefer media-type versioning —
+`Accept: application/vnd.acme.user.v2+json`, with the handler reading the requested version off the `Accept` header
+and echoing it in the response `Content-Type` (FastAPI: `accept: str | None = Header(default=None)` plus a
+`Response.headers["Content-Type"] = ...`) — or a lighter dedicated version header (`Acme-Version: 2024-11-01`). Default
+to not versioning at all and evolve compatibly until a breaking change forces it.
+
 ## One router per resource, composed in the factory
 
 ```python
@@ -76,7 +99,7 @@ async def history(task_id: TaskId, store: Store, limit: Limit = 50) -> dict[str,
 
 - Use `alias="projectId"` to accept a camelCase query/header while the Python name stays snake_case.
 - Constraints (`ge`, `le`, `min_length`, `pattern`) become OpenAPI schema **and** runtime validation — a rejected value
-  produces a 422 you'll reshape into your envelope (see `validation-and-errors.md`).
+  produces a 422 you'll reshape into your envelope (see `errors.md`).
 - Prefer `Annotated[T, Query(...)]` aliases over inline defaults; they're reusable and keep signatures readable.
 
 ## The resource-action RPC pattern (`POST /tasks/{id}:complete`)
@@ -204,7 +227,7 @@ obscure them — clarity over cleverness.
 
 Handlers must not pass Pydantic models into the domain. Each request model exposes `to_command()` that produces the
 frozen domain command, doing any strict parsing the framework's lenient coercion wouldn't (see
-`validation-and-errors.md`). The handler's job is exactly three lines: parse (FastAPI), dispatch (`decide`/store), and
+`validation.md`). The handler's job is exactly three lines: parse (FastAPI), dispatch (`decide`/store), and
 serialize.
 
 ## Response shaping
@@ -220,4 +243,3 @@ Two viable styles; pick one and be consistent:
 
 Set explicit `status_code=status.HTTP_201_CREATED` on creates and `204` on no-content deletes; don't rely on the
 default 200 where the contract says otherwise.
-</content>

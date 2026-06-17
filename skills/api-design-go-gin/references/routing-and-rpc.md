@@ -14,9 +14,9 @@ func NewRouter(app *App) *gin.Engine {
     r.Use(gin.Recovery())          // turn panics into 500s; add your own logging middleware
     r.HandleMethodNotAllowed = true // known path + undocumented method → 405, not 404
 
-    // Meta endpoints — always open (no auth gate).
-    r.GET("/healthz", healthz)
-    r.GET("/readyz", app.readyz)
+    // Open meta endpoints — shallow readiness/liveness + the contract (no auth gate).
+    r.GET("/readyz", app.readyz)   // shallow DB ping → 200/503
+    r.GET("/livez", livez)         // bodyless 200 liveness
     r.GET("/openapi.json", app.openapiDoc)
 
     // Everything else behind the optional auth gate.
@@ -24,6 +24,9 @@ func NewRouter(app *App) *gin.Engine {
     if app.Auth != nil {
         api.Use(app.Auth)
     }
+
+    // Detailed health report (DB + build/version) is gated — it leaks topology.
+    api.GET("/healthz", app.healthz)
 
     // REST resources.
     api.POST("/tasks", app.createTask)
@@ -42,12 +45,29 @@ func NewRouter(app *App) *gin.Engine {
 ```
 
 **Middleware order matters:** recovery and request-logging first (so they wrap everything), then auth, then route-group
-or per-route middleware. Register the always-open meta routes _outside_ the authed group.
+or per-route middleware. Register the open meta routes (`/readyz`, `/livez`, `/openapi.json`) _outside_ the authed
+group; the detailed `/healthz` report goes _inside_ it (see `observability-deployment.md`).
 
 ### Organize routes by resource
 
 For larger APIs, give each resource its own file with a `register(api *gin.RouterGroup, app *App)` function and call
 them from `NewRouter`. Keeps `NewRouter` a readable table of contents and the handlers near their routes.
+
+## Decide the API style before wiring routes
+
+Confirm the convention with the user before routing (see *Decide the API Style First* in SKILL.md). Four styles:
+
+1. **Pure REST** — only resources and HTTP verbs; no action endpoints (`PATCH /users/:id`).
+2. **Pure RPC** — every operation is a named procedure (`POST /resetUserPassword`); resources secondary or absent.
+   (For gRPC specifically, this skill's HTTP/REST machinery does not apply.)
+3. **Mixed: resources + actions on one tree** — REST resources plus resource-scoped commands as a sub-path. The colon
+   form `POST /users/:id:resetPassword` (Google AIP-136) or a sub-resource path `POST /users/:id/reset-password`.
+   **This is the skill's default**, and the colon dispatcher below implements it.
+4. **Split REST + RPC trees** — REST under one prefix and procedures under another (`/rest/...` and `/rpc/...`).
+
+Styles 2 and 4 reuse the same `parse → delegate → map` handler shape; only the routing layout changes (one Gin group
+per tree, e.g. `r.Group("/rest")` and `r.Group("/rpc")`). Pick one convention for the whole surface. The colon
+dispatcher below is the implementation for style 3.
 
 ## RPC custom methods: `POST /resource/{id}:action`
 
@@ -107,7 +127,7 @@ func (a *App) dispatchTaskCommand(c *gin.Context) {
 ```
 
 Each `case` binds its own request DTO, calls the domain core, and maps the result — see
-`parsing-and-validation.md`. A typical command handler:
+`validation.md`. A typical command handler:
 
 ```go
 func (a *App) completeTask(c *gin.Context, id string) {
@@ -172,20 +192,14 @@ Whether a malformed filter is a `422` or silently ignored is a **contract decisi
 `422`, validate and reject; if it documents only `200`, drop the bad filter (an unknown enum value just matches no rows).
 Read the spec; don't guess.
 
-## The routing contract test
+## Versioning: media type or header, never the path
 
-Prove the router's registered routes equal the OpenAPI operations — no missing operation, no extra route. Custom-method
-operations collapse onto their dispatcher route. (Full code in `testing-and-contract.md`.)
+Do not encode the version in the path (`/api/v1/...`) — it forks resource identifiers and breaks caching and links.
+When a breaking change finally forces a version, negotiate it on the content type: read the client's
+`Accept: application/vnd.acme.user.v2+json`, pick the representation, and echo the chosen value back in
+`Content-Type` (`c.Negotiate` or a manual `c.GetHeader("Accept")` switch dispatches to the right serializer). A
+dated/integer version header (`Acme-Version: 2024-11-01`) is a lighter alternative. Default to **not versioning** —
+add optional fields compatibly for as long as you can. See *Version With Media Types or Headers* in SKILL.md.
 
-```go
-router := httpapi.NewRouter(&httpapi.App{})
-actual := map[string]bool{}
-for _, route := range router.Routes() {
-    actual[route.Method+" "+route.Path] = true
-}
-// expected built from openapi.Operations(), converting {param} → :param and
-// the trailing "{param}:command" → :param (the dispatcher route).
-assert.Equal(t, expected, actual)
-```
-
-This catches a forgotten route or a typo'd path the moment it diverges from the contract.
+The router-vs-spec route-coverage test that proves these routes match the OpenAPI operations lives in
+`openapi-contract.md`.

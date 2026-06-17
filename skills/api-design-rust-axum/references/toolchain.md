@@ -1,5 +1,12 @@
 # Dependencies, `Cargo.toml`, Lints & Toolchain
 
+**Detect and respect the project's runner first; what follows is the greenfield default.** In an existing
+project, use the package manager and task runner it already has — Rust converges on `cargo`, but honor an
+existing `just`/`Makefile`, `cargo-make`, or container-based build, and run tools through it (e.g. invoke
+`docker compose run …` or `just test` rather than calling `cargo` directly) when that is how the project
+builds. The crate stack and commands below are the blessed starting point for a **new** service, not a
+mandate to migrate a working project onto them.
+
 The crate _names and roles_ here are durable; the _versions_ are not. Always add and bump with `cargo`, which reads
 the live registry, and verify the API on docs.rs for the resolved version — the web stack churns (Axum/Tokio/Tower
 co-evolve, and `sqlx` 0.9 / `jsonwebtoken` 10 landed after these examples were written).
@@ -41,7 +48,7 @@ manifest readable; the lockfile is the source of truth.
 - **`tracing` + `tracing-subscriber`** — structured logging (`json`, `env-filter`). See
   `observability-deployment.md`.
 - **`jsonwebtoken`** — JWT validation for OIDC resource-server auth. See `auth-oauth2.md`.
-- **`ulid`** (or **`uuid`**) — sortable identifiers wrapped in newtypes (see `project-structure.md`).
+- **`ulid`** (or **`uuid`**) — sortable identifiers wrapped in newtypes (see `domain-core.md`).
 - **Dev-deps** `tower` (`util`) + `http-body-util` — drive the router in-process in tests via `oneshot` and collect
   response bodies. See `testing.md`.
 

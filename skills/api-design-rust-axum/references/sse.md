@@ -1,12 +1,29 @@
 # Server-Sent Events & Live Streaming
 
+**Scaling caveat — read before you build.** The in-process `LISTEN/NOTIFY` fan-out shown below holds one
+long-lived connection per subscriber inside the app process. That is fine for a proof of concept or a
+low-concurrency internal tool — roughly **under 100 concurrent streams on a single instance** — but it does
+**not** scale: open connections pin memory and file descriptors to specific instances, every deploy drops
+every stream, and horizontal scaling multiplies the `LISTEN` load on Postgres. **For production, or anything
+user-facing at scale, do not fan out from the app.** Put a GRIP-capable realtime proxy in front — **Pushpin**
+(self-hosted, open source) or **Fastly Fanout** — and have the app *publish* events to it while holding no
+long-lived client connections itself. The proxy owns the open connections, so the service scales and deploys
+like any stateless app. Treat the design below as the PoC tier and the proxy as the blessed production path.
+
+**Keep-alives are mandatory.** Every stream emits a heartbeat comment (`: keep-alive\n\n`) at least every
+**30 seconds**, whether the app or the proxy owns the connection. Idle SSE connections are silently dropped
+by proxies and load balancers otherwise, and the heartbeat is how a dead client is detected. With a GRIP
+proxy, configure its keep-alive; with the in-process design, the handler sends it on a 30-second timer.
+
 SSE is the simplest way to push server→client updates over plain HTTP: a long-lived `text/event-stream` response of
 `id:`/`event:`/`data:` frames, with automatic browser reconnection that replays the last seen id via the
 `Last-Event-ID` header. Axum has first-class support (`axum::response::sse`). For server-pushed events that originate
-in the database, the clean architecture is **Postgres `LISTEN/NOTIFY` → one listener task → a `tokio::broadcast`
+in the database, the PoC-tier architecture is **Postgres `LISTEN/NOTIFY` → one listener task → a `tokio::broadcast`
 channel → many SSE connections.**
 
-## The fan-out architecture
+## The fan-out architecture (PoC / low-concurrency tier)
+
+This in-process fan-out is the PoC/<100-concurrent-streams design. Past that, move to the GRIP proxy below.
 
 ```
 write tx: INSERT event … ; SELECT pg_notify('events', '<event_id>')   (same transaction)
@@ -76,6 +93,7 @@ as the cursor.
 
 ```rust
 use std::convert::Infallible;
+use std::time::Duration;
 use axum::response::sse::{Event, KeepAlive, Sse};
 use futures_core::Stream;
 use tokio::sync::broadcast::error::RecvError;
@@ -121,7 +139,9 @@ pub(super) async fn stream_events(
         }
     };
 
-    Sse::new(stream).keep_alive(KeepAlive::default())  // periodic comments keep proxies from closing idle conns
+    // Mandatory 30s heartbeat: idle SSE connections are dropped by proxies/LBs otherwise, and the
+    // comment is how a dead client is detected. Never omit this or leave it on the default interval.
+    Sse::new(stream).keep_alive(KeepAlive::new().interval(Duration::from_secs(30)))
 }
 ```
 
@@ -157,5 +177,26 @@ fn sse_name(event_type: &str) -> &'static str {
 The resume guarantee clients rely on: after a drop, the browser sends `Last-Event-ID: <last id it saw>`, and the
 server must deliver **strictly later** events — no gaps, no duplicates. The id-ordered backfill plus the
 `record.id <= cursor` skip above provide exactly that, which is why event ids must be **monotonic** and sort in
-append order (see the monotonic ULID generator in `project-structure.md`). Test it: subscribe, mutate, assert the
+append order (see the monotonic ULID generator in `domain-core.md`). Test it: subscribe, mutate, assert the
 frames; reconnect with a `Last-Event-ID` and assert only later events arrive (see `testing.md`).
+
+## Production: publish to a GRIP proxy (Pushpin / Fastly Fanout)
+
+At production scale the app must **not** hold the open connections — a GRIP-capable realtime proxy (Pushpin,
+self-hosted; or Fastly Fanout) does, and the app stays stateless so it scales and deploys like any other service.
+The mechanism is **GRIP** (Generic Realtime Intermediary Protocol):
+
+- **The client connects to the proxy**, which forwards the request to the app's `GET /events` endpoint.
+- **The app responds with GRIP hold instructions** instead of streaming: a `Grip-Hold: stream` response header (plus
+  `Grip-Channel: events` to subscribe the held connection to a channel) and an empty/short body. The proxy then holds
+  the long-lived SSE connection open on the app's behalf — the app's handler returns immediately.
+- **The app publishes events to the proxy's publish endpoint** (Pushpin's `POST http://<pushpin>:5561/publish/`, or
+  Fanout's publish API) over the proxy's control plane. The same `LISTEN/NOTIFY` listener task is reused, but instead
+  of `broadcast::Sender::send` to in-process receivers it POSTs each event to the proxy, which fans it out to every
+  held connection on that channel.
+- **Configure the proxy's keep-alive** to emit the `: keep-alive` comment every 30s (the mandatory heartbeat moves
+  from the handler to the proxy config).
+
+The backfill/`Last-Event-ID` resume logic is unchanged in shape — it just runs as a publish-and-hold exchange rather
+than an in-process stream. A full Pushpin/Fanout config is out of scope here; the load-bearing decision is to publish
+to the proxy rather than fan out from the app.

@@ -4,6 +4,21 @@ NestJS controllers map paths to methods. REST is straightforward; the interestin
 **resource-action RPC** route — `POST /tasks/{taskId}:complete` — which puts a literal colon in the path segment. This
 file covers both, and the one routing trap that every implementation must handle.
 
+## Decide the style before you wire routes
+
+The path layout depends on which API style the surface follows; confirm it first (see *Decide the API Style First* in
+SKILL.md), and if the contract does not encode one and you are greenfield, **ask the user**:
+
+1. **Pure REST** — resources and uniform verbs only (`PATCH /users/{id}`); no action endpoints.
+2. **Pure RPC** — every operation a named procedure (`POST /resetUserPassword`); gRPC/Connect or JSON-RPC live here.
+3. **Mixed: resources + actions on one tree** — REST plus resource-scoped commands, spelled either as the colon form
+   `POST /users/{id}:resetPassword` (Google AIP-136) or a sub-resource path `POST /users/{id}/reset-password`. **This
+   is the skill's default**, and the colon dispatcher below implements it.
+4. **Split REST + RPC trees** — REST under one prefix, procedures under another (`/rest/users/{id}` + `/rpc/...`).
+
+Styles 2 and 4 reuse the exact same `parse → delegate → map` handler shape; only the controller prefixes and route
+declarations change. The colon-dispatch machinery below is specific to the mixed style.
+
 ## REST controllers
 
 A REST controller marshals HTTP into a single service call and serializes the result. It contains no business logic.
@@ -227,8 +242,18 @@ export const listTasksQuerySchema = z.object({
 });
 ```
 
+## Versioning — never in the path
+
+Keep the version out of the path (`/api/v1/tasks` forks resource identifiers and breaks caching). When you must version,
+negotiate it: read the requested version from the `Accept` header (`application/vnd.acme.task.v2+json`) and echo the
+chosen representation in the response `Content-Type`, or read a dedicated version header (`Acme-Version: 2024-11-01`). In
+Nest, `@Headers("accept")` (or a small interceptor that sets the response `Content-Type`) gives you the negotiated
+media type without per-route plumbing. Default to **not** versioning until a breaking change forces it — see *Version
+With Media Types or Headers* in SKILL.md.
+
 ## Projects and meta
 
-Projects follow the same shape: a REST controller plus a colon-command controller for `:archive` / `:restore`. Meta
-endpoints (`/healthz`, `/readyz`, `/openapi.json`) are plain `@Get` handlers on small controllers and are exempt from
-auth. There is no RPC dispatch for meta — they are fixed paths.
+Projects follow the same shape: a REST controller plus a colon-command controller for `:archive` / `:restore`. The open
+meta endpoints (`/readyz`, `/livez`, `/openapi.json`) are plain `@Get` handlers on small controllers and are exempt from
+auth; `/healthz` is a gated route (see `references/auth-oauth2.md` and `references/observability-deployment.md`). There
+is no RPC dispatch for meta — they are fixed paths.

@@ -167,4 +167,6 @@ In the middleware: `c.Request = c.Request.WithContext(WithSubject(c.Request.Cont
 - [ ] Enforcement is **config-gated** (`AUTH_REQUIRED`) but the scaffolding is always wired, so turning it on is a flag
       flip, and tests can run with the gate off (`App.Auth = nil`).
 - [ ] Tokens/claims are never logged; the raw `Authorization` header never appears in logs or error bodies.
-- [ ] Meta endpoints (`/healthz`, `/readyz`, `/openapi.json`) stay **open** — outside the authed group.
+- [ ] The open meta endpoints (`/readyz`, `/livez`, `/openapi.json`) stay **open** — outside the authed group — while
+      the detailed `/healthz` report is registered **inside** the authed group (it leaks internal topology). See
+      `observability-deployment.md` for the two-probes-two-audiences split.

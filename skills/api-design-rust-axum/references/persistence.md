@@ -1,5 +1,8 @@
 # Persistence with `sqlx`
 
+**Greenfield default.** If the project already has a datastore, use it and skip this — see *Adopt, Don't Impose*
+in SKILL.md.
+
 `sqlx` gives async, compile-time-checked SQL without an ORM: you write SQL, and the `query!`/`query_as!` macros
 verify it against a real database schema at build time. This catches column/type drift the moment it happens —
 the single highest-value safety net for an agentic backend build.
@@ -44,7 +47,7 @@ cargo sqlx prepare --check -- --all-targets
 ```
 
 `--all-targets` includes queries in tests, because `clippy --all-targets` and `cargo test` compile them offline too.
-A stale `.sqlx` is a build break — treat `sqlx prepare --check` as part of the gate (`dependencies.md`).
+A stale `.sqlx` is a build break — treat `sqlx prepare --check` as part of the gate (`toolchain.md`).
 
 ```rust
 // A checked insert: `query!` validates columns/types against the schema.

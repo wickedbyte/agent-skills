@@ -1,15 +1,14 @@
 ---
 name: api-design-python-fastapi
 description: >-
-    Use when building, structuring, or testing a REST or RPC API in Python with FastAPI — scaffolding a new FastAPI
-    service, implementing endpoints against an OpenAPI/Swagger specification, organizing routers / Pydantic models /
-    dependencies, wiring async SQLAlchemy + asyncpg persistence and Alembic migrations, adding OAuth 2.0 / OIDC JWT
-    auth, streaming server-sent events, or testing a FastAPI app against its OpenAPI contract (httpx ASGITransport,
-    Schemathesis). Triggers on FastAPI, uvicorn, Pydantic v2 request/response models, `Depends()` / `Annotated`
-    dependency injection, `APIRouter`, resource-action colon routes (`POST /things/{id}:action`), `pydantic-settings`,
-    the app-factory + `lifespan` pattern, the error-envelope exception handlers, and the emitted-OpenAPI ≡ spec
-    contract test. Use this even when the user only hands over an OpenAPI/Swagger document and asks for "a Python API",
-    or does not explicitly say FastAPI. Layer it on top of `best-practices-python`, which governs language-level style.
+    Use when building, structuring, or testing a REST or RPC API in Python with FastAPI — scaffolding a service,
+    implementing an OpenAPI/Swagger contract, or organizing routers, Pydantic models, and dependencies. Covers async
+    SQLAlchemy + asyncpg persistence with optimistic concurrency, resource-action RPC routes
+    (`POST /things/{id}:action`), boundary validation and a single error envelope (incl. FastAPI's 422 reconciliation),
+    OAuth 2.0 / OIDC JWT auth, server-sent events, and the emitted-OpenAPI ≡ canonical contract test (httpx
+    ASGITransport, Schemathesis). Triggers on FastAPI, uvicorn, Pydantic v2, `Depends()`/`Annotated` injection, or just
+    an OpenAPI doc plus "a Python API" — even when the user does not say FastAPI. Layer it on `best-practices-python`
+    for language-level style.
 license: https://github.com/wickedbyte/agent-skills/blob/main/LICENSE
 ---
 
@@ -64,6 +63,27 @@ defaults: frozen dataclasses, `StrEnum`, pure functions, injected Protocols.
 - Adding OAuth 2.0 / OIDC resource-server JWT validation, or server-sent events
 - Writing the test pyramid and the **emitted-OpenAPI ≡ canonical-spec** contract test
 
+## Adopt, Don't Impose — These Are Greenfield Defaults
+
+The stack and structure below are the blessed starting point for a **new** service. In an existing
+codebase they yield to what the project already does — read the repo first and conform to it. Imposing
+this skill's defaults on a working project is a failure mode, not thoroughness.
+
+- **Persistence is a default, not a mandate.** If the project already has a datastore — SQLite, MySQL,
+  MongoDB, a hosted API, anything — use it. Do **not** introduce Postgres alongside it. The persistence
+  guidance here applies only when there is no datastore yet. The architecture (a pure core behind a store
+  seam) holds regardless of engine; the engine choice is the project's, not the skill's.
+- **Structure is a target, not a teardown.** The layering (pure domain core ← store ← HTTP edge) is the
+  default for new work and a direction to refactor *toward*, but adapt it to the directory conventions the
+  project already uses. Do not restructure a working codebase to match the diagrams here.
+- **Run the project's toolchain, not your own.** Detect and use the project's existing package manager and
+  task runner. If the project uses `uv`, run every tool through it (`uv run ruff`, `uv run pytest`) rather
+  than invoking tools directly; if it uses Poetry, pip-tools, pipenv, or conda, use that. `uv` is the
+  greenfield default, not a migration mandate. If the project runs its tooling through `docker` /
+  `docker compose` or a custom `Makefile`/script/task runner, invoke the tools that way instead of calling
+  them directly. The named tools below are greenfield defaults — never a reason to migrate a project off
+  what it already uses.
+
 ## The dependency stack (add with `uv`, verify latest, never hand-pin)
 
 Add these with `uv add` / `uv add --dev`; the lockfile records exact versions. Reach for a library only when the
@@ -71,7 +91,7 @@ feature needs it — don't install auth or SSE deps for a service that has neith
 
 | Concern                | Library                                     | Notes                                                         |
 | ---------------------- | ------------------------------------------- | ------------------------------------------------------------- |
-| Package/venv manager   | **uv**                                      | Never system `pip`/`python3`. Every command is `uv run …`.    |
+| Package/venv manager   | **uv**                                      | Greenfield default. In a `uv` project every command is `uv run …`; in a Poetry/pip-tools/pipenv/conda project, use that project's runner. |
 | Web framework          | **fastapi**                                 | Emits OpenAPI **3.1** natively.                               |
 | ASGI server            | **uvicorn[standard]**                       | `uvicorn`/`uvloop`/`httptools`; add Granian only if measured. |
 | Validation / models    | **pydantic** (v2)                           | `ConfigDict(extra="forbid")` → `additionalProperties:false`.  |
@@ -79,7 +99,7 @@ feature needs it — don't install auth or SSE deps for a service that has neith
 | DB toolkit             | **sqlalchemy[asyncio]** (2.0)               | Core `text()` is enough for an event store; ORM is optional.  |
 | Async driver           | **asyncpg**                                 | Postgres; also exposes `LISTEN/NOTIFY` for SSE.               |
 | Migrations             | **alembic**                                 | Async env; run out of band, never per worker.                 |
-| Server-sent events     | **sse-starlette**                           | `EventSourceResponse`; pair with asyncpg `add_listener`.      |
+| Server-sent events     | **sse-starlette**                           | `EventSourceResponse(ping=30)`; pair with asyncpg `add_listener` for PoC, a GRIP proxy (Pushpin/Fastly Fanout) at scale. |
 | Auth (resource server) | **pyjwt[crypto]**                           | `PyJWKClient` validates RS256/ES256 against the issuer JWKS.  |
 | IDs                    | **python-ulid**                             | Sortable, prefixed string ids (`task_01J…`).                  |
 | Logging                | **structlog** (or stdlib `logging` + JSON)  | Structured, to stdout. Do **not** unit-test logging.          |
@@ -117,13 +137,45 @@ service/
     contract/          # app.openapi() ≡ canonical spec; route coverage
 ```
 
-See `references/project-structure.md` for the app factory, `lifespan`, settings, and dependency injection in full.
+See `references/bootstrap-and-config.md` for the app factory, `lifespan`, settings, and dependency injection in full.
+
+## Decide the API Style First — Confirm With the User
+
+"REST with resource-action commands" is this skill's default, but it is not the only valid convention, and
+the choice shapes every path. Before writing routes, confirm which style the API follows — if the OpenAPI
+contract already encodes one, follow it; if you are greenfield or it is ambiguous, **ask the user rather
+than assume**:
+
+1. **Pure REST** — only resources and the uniform HTTP verbs; no action endpoints. State changes are
+   modeled as resource mutations (`PATCH /users/{id}`).
+2. **Pure RPC** — every operation is a named procedure (`POST /resetUserPassword`); resources are secondary
+   or absent. (gRPC/Connect or JSON-RPC live here. If the user wants gRPC specifically, this skill's
+   HTTP/REST machinery does not apply — say so.)
+3. **Mixed: resources + actions on one tree** — REST resources plus resource-scoped commands as a sub-path.
+   The colon form `POST /users/{id}:resetPassword` (Google AIP-136) is one spelling; a sub-resource path
+   `POST /users/{id}/reset-password` is another. **This is the skill's default**, and the dispatcher below
+   implements it.
+4. **Split REST + RPC trees** — REST under one prefix and procedures under another, e.g. `/rest/users/{id}`
+   and `/rpc/reset-user-password`.
+
+Styles 2 and 4 reuse the same `parse → delegate → map` handler shape as the default; only the routing
+layout changes. Pick one convention for the whole surface and keep it consistent.
+
+## Version With Media Types or Headers — Never the URL Path
+
+Do not put the version in the path (`/api/v1/users`, `/rest/v2/...`). URL-path versioning forks resource
+identifiers, breaks caching and hypermedia links, and couples every client to a version string in every
+URL. Prefer **media-type (content-negotiation) versioning** — `Accept: application/vnd.acme.user.v2+json`,
+with the response echoing the chosen `Content-Type` — or, as a lighter option, a dedicated version header
+(`Acme-Version: 2024-11-01`, date- or integer-based). Default to **not versioning at all** until a breaking
+change forces it: evolve compatibly (add optional fields; never repurpose or remove existing ones) for as
+long as you can, and version only the representations that actually break.
 
 ## Core defaults — apply unless the contract gives a reason not to
 
 1. **Contract-first.** Treat the OpenAPI doc as frozen. If it looks wrong, raise it — don't quietly diverge. Decide
    early whether the app **emits** its schema (FastAPI generates it from your routes/models) or **serves a canonical
-   file verbatim**; a test pins emitted ≡ canonical either way. See `references/testing-and-contract.md`.
+   file verbatim**; a test pins emitted ≡ canonical either way. See `references/openapi-contract.md`.
 2. **Three layers, dependencies inward.** `domain/` (pure, all the rules) ← `store/` (persistence) ← `api/` (HTTP).
    The domain core imports nothing framework-shaped and is unit-tested in isolation.
 3. **App factory + `lifespan`.** Build the app in `create_app(...)` that accepts injected collaborators (store, clock,
@@ -141,20 +193,25 @@ See `references/project-structure.md` for the app factory, `lifespan`, settings,
    command routes before the generic `/tasks/{task_id}`. See `references/routing-and-rpc.md`.
 8. **One error envelope; map every failure to it.** Define a domain exception hierarchy, register
    `@app.exception_handler(...)` for each, and **reconcile FastAPI's default 422**: install a `RequestValidationError`
-   handler so the _body_ matches your envelope (status stays 422). See `references/validation-and-errors.md`.
+   handler so the _body_ matches your envelope (status stays 422). See `references/errors.md`.
 9. **Async all the way down.** `async def` handlers, async engine, async sessions. Never call blocking I/O on the event
    loop; if a dependency is sync (e.g. a JWKS fetch), make the _dependency_ a plain `def` so FastAPI runs it in the
    threadpool.
 10. **Transactional writes + optimistic concurrency.** Append/insert and update projections in **one** transaction; let
-    a `UNIQUE(stream, version)` collision surface as a 409 conflict. See `references/persistence-and-events.md`.
-11. **SSE via Postgres `LISTEN/NOTIFY`** when you stream: a single shared listener fans events to per-subscriber
-    `asyncio.Queue`s through `EventSourceResponse`; `Last-Event-ID` backfills then goes live.
+    a `UNIQUE(stream, version)` collision surface as a 409 conflict. See `references/persistence.md`.
+11. **SSE: in-process `LISTEN/NOTIFY` is the PoC tier; a GRIP proxy is production.** When you stream, a single shared
+    listener fans events to per-subscriber `asyncio.Queue`s through `EventSourceResponse`; `Last-Event-ID` backfills
+    then goes live. That in-process fan-out holds for a PoC or low-concurrency tool (**under ~100 concurrent streams on
+    one instance**); for production or anything user-facing at scale, front it with a GRIP proxy (**Pushpin** or
+    **Fastly Fanout**) — the app *publishes*, the proxy holds connections. A **30-second keep-alive is mandatory** either
+    way (`EventSourceResponse(..., ping=30)`). See `references/sse.md`.
 12. **OAuth 2.0 as a gated dependency.** Validate the bearer JWT against the issuer's JWKS (`PyJWKClient`), enforce only
-    when `AUTH_REQUIRED=true`, keep meta endpoints (`/healthz`, `/readyz`, `/openapi.json`) always open. See
-    `references/auth.md`.
+    when `AUTH_REQUIRED=true`, keep the open meta set (`/readyz`, `/livez`, `/openapi.json`) always reachable. `/healthz`
+    is a richer report (DB + build/version) that **sits behind the auth gate**, not in the open set. See
+    `references/auth-oauth2.md`.
 13. **The test pyramid + the contract test.** Unit (pure domain) → integration (store + DB) → functional (HTTP via
     `httpx.ASGITransport`) → contract (emitted ≡ canonical, plus Schemathesis fuzzing). See
-    `references/testing-and-contract.md`.
+    `references/testing.md` and `references/openapi-contract.md`.
 14. **A mechanical gate.** `ruff format --check` → `ruff check` → `mypy --strict` (or pyright) → `pytest`, all exit
     zero. Strict typing is non-negotiable: it is the correctness signal a dynamic language otherwise denies you.
 
@@ -164,19 +221,22 @@ Work outside-in on structure but **domain-first** on logic — the rules live in
 HTTP exists.
 
 1. **Scaffold + gate.** `uv init` (src layout), add deps, configure Ruff + the type checker + pytest, an app factory
-   with `/healthz`, `compose.yaml` (db + cache), a uv-based `Dockerfile`. Gate green on the skeleton.
+   with the open probes (`/readyz`, `/livez`), `compose.yaml` (db + cache), a uv-based `Dockerfile`. Gate green on the
+   skeleton.
 2. **Migrations + schema.** Alembic async env; the tables/indexes/constraints your data model needs. `upgrade head` then
    `downgrade base` must round-trip cleanly.
 3. **Domain core (TDD).** `decide`/`apply` (or your equivalent service functions) over frozen dataclasses + `StrEnum`,
    with a failing unit test written from each contract rule first. Type-check strict.
 4. **Store.** Transactional writes, optimistic concurrency, queries/projections, a camelCase ↔ snake_case codec.
    Integration-test against a real database.
-5. **REST endpoints + error handlers.** Routers, Pydantic schemas (`extra="forbid"`), the error-envelope handlers and
+5. **Confirm the API style (see SKILL.md "Decide the API Style First").** Settle REST / RPC / mixed / split with the
+   user before wiring routes; the default is mixed (resource + colon actions).
+6. **REST endpoints + error handlers.** Routers, Pydantic schemas (`extra="forbid"`), the error-envelope handlers and
    the 422 reconciliation. Functional-test each.
-6. **RPC command routes.** The colon-routes dispatching to `decide`, with a routing test proving the id parses without
+7. **RPC command routes.** The colon-routes dispatching to `decide`, with a routing test proving the id parses without
    the `:command` suffix.
-7. **Auxiliary surfaces.** Filtered list/view queries, SSE, OAuth — each behind its own tests.
-8. **Contract.** Assert `app.openapi()` ≡ canonical (reconciling the generated 422), then run Schemathesis against the
+8. **Auxiliary surfaces.** Filtered list/view queries, SSE, OAuth — each behind its own tests.
+9. **Contract.** Assert `app.openapi()` ≡ canonical (reconciling the generated 422), then run Schemathesis against the
    running app. Seed data idempotently; write the README; full gate green.
 
 ## Quick triage table
@@ -194,8 +254,9 @@ HTTP exists.
 | Talking to Postgres                                | async engine + `async_sessionmaker(expire_on_commit=False)`; `text()` is fine  |
 | A write that must be atomic                        | `async with session.begin():` — append + project in one transaction            |
 | Concurrent-update protection                       | `UNIQUE(stream, version)`; map `IntegrityError` → 409 conflict                 |
-| Streaming events to clients                        | `sse-starlette` `EventSourceResponse` + asyncpg `add_listener` (LISTEN/NOTIFY) |
-| Protecting endpoints                               | Resource-server JWT dependency, gated by `AUTH_REQUIRED`; meta always open     |
+| Which routing convention to use                    | Confirm REST / RPC / mixed / split with the user; default is mixed (resource + colon actions) |
+| Live updates to clients                            | SSE; in-process LISTEN/NOTIFY for PoC/<100 conns, a GRIP proxy (Pushpin/Fastly Fanout) for production; 30s keep-alive mandatory |
+| Protecting endpoints                               | Resource-server JWT dependency, gated by `AUTH_REQUIRED`; `/readyz`+`/livez`+`/openapi.json` open, `/healthz` gated |
 | Testing an endpoint                                | `httpx.AsyncClient(transport=ASGITransport(app=app))` — in-process, no socket  |
 | Proving the wire contract                          | `app.openapi() == canonical` test **and** Schemathesis fuzzing                 |
 
@@ -216,23 +277,41 @@ HTTP exists.
 | `pip install`, `requirements.txt`, `os.environ[...]`             | `uv add`, `uv.lock`, `pydantic-settings`                                    |
 | Pydantic models leaking into the domain core                     | Convert to a domain command at the edge (`to_command()`)                    |
 | Only testing happy paths over HTTP                               | Unit-test the domain exhaustively; reserve HTTP tests for the translation   |
+| Version in the URL path (`/api/v1/...`)                          | Version via media type (`Accept: application/vnd...+json`) or a version header; never the path |
+| Fanning out SSE from the app at scale                            | Front it with a GRIP proxy (Pushpin/Fastly Fanout); the app publishes, the proxy holds connections |
+| Optional/absent SSE keep-alive                                   | Mandatory heartbeat every 30s (`EventSourceResponse(..., ping=30)`)         |
 
 ## Reference files
 
 Read the one that matches the task; each is self-contained with idiomatic, fully-typed examples.
 
-- `references/project-structure.md` — layered layout, the `create_app` factory, `lifespan`, `pydantic-settings`,
-  dependency injection with `Annotated`, the pure domain core, the `uv`/Docker/Makefile toolchain.
+- `references/project-structure.md` — the layered layout, the inward-dependency rule, and why the domain core carries no
+  framework imports.
+- `references/bootstrap-and-config.md` — the `create_app` factory, `lifespan` (not `on_event`), `pydantic-settings`, and
+  dependency injection with `Depends` + `Annotated`.
+- `references/domain-core.md` — the pure domain core: `decide`/`apply` over frozen dataclasses and `StrEnum`, with the
+  clock injected for deterministic timestamps.
+- `references/toolchain.md` — the `pyproject.toml`/`Makefile` skeleton, Ruff/type-checker/pytest config, and the
+  mechanical gate (`ruff format --check` → `ruff check` → `mypy --strict` → `pytest`).
 - `references/routing-and-rpc.md` — `APIRouter` composition, REST endpoints, path/query/body parsing, the
   resource-action **colon-route** dispatch in depth, request → command mapping, response shaping.
-- `references/validation-and-errors.md` — Pydantic v2 at the boundary (`extra="forbid"`, aliases, validators, strict
-  parsing), the error envelope, exception handlers, and the FastAPI **422 reconciliation**.
-- `references/persistence-and-events.md` — async SQLAlchemy 2.0 + asyncpg, sessions, transactional writes, optimistic
-  concurrency, projections, Alembic async migrations, and SSE over `LISTEN/NOTIFY`.
-- `references/auth.md` — OAuth 2.0 / OIDC resource-server JWT validation with JWKS, FastAPI security utilities and
+- `references/validation.md` — Pydantic v2 at the boundary (`extra="forbid"`, aliases, validators, strict parsing,
+  tri-state PATCH via `model_fields_set`).
+- `references/errors.md` — the error envelope, the domain exception hierarchy, wiring the exception handlers, and the
+  FastAPI **422 reconciliation**.
+- `references/persistence.md` — async SQLAlchemy 2.0 + asyncpg, sessions, transactional writes, optimistic concurrency,
+  projections, querying, and Alembic async migrations.
+- `references/sse.md` — server-sent events: the in-process Postgres `LISTEN/NOTIFY` PoC tier (`SseHub`,
+  `EventSourceResponse(ping=30)`, backfill, `Last-Event-ID` resume), the mandatory 30s keep-alive, and the GRIP-proxy
+  (Pushpin/Fastly Fanout) production path.
+- `references/auth-oauth2.md` — OAuth 2.0 / OIDC resource-server JWT validation with JWKS, FastAPI security utilities and
   scopes, the `AUTH_REQUIRED` gate, and testing auth.
-- `references/testing-and-contract.md` — the pytest pyramid, `pytest-asyncio`, `httpx.ASGITransport`, fixtures, the
-  emitted-OpenAPI ≡ canonical contract test, route coverage, and Schemathesis property-based fuzzing.
+- `references/openapi-contract.md` — the emitted-OpenAPI ≡ canonical contract test, route coverage, and Schemathesis
+  property-based fuzzing.
+- `references/testing.md` — the pytest pyramid, `pytest-asyncio`, `httpx.ASGITransport`, fixtures, the unit/integration/
+  functional layers, and what not to test.
+- `references/observability-deployment.md` — liveness/readiness probes and structured logging, plus the `Dockerfile` and
+  `compose.yaml` deployment skeleton.
 
 ## Pre-flight self-check
 
@@ -246,7 +325,7 @@ Before calling a FastAPI change done:
 - [ ] Resource-action routes use the colon pattern and parse the id without the `:command` suffix.
 - [ ] Writes are transactional; optimistic-concurrency conflicts surface as 409.
 - [ ] Dependencies are injected via `Depends`; the app is built by a factory with a `lifespan`; no import-time I/O.
+- [ ] `/readyz` + `/livez` + `/openapi.json` stay open; `/healthz` (the richer report) is behind the auth gate.
+- [ ] Any SSE stream sends a mandatory keep-alive every 30s; in-process LISTEN/NOTIFY is labeled PoC, a GRIP proxy is the production path.
 - [ ] `app.openapi()` matches the canonical spec; Schemathesis runs clean against the live app.
 - [ ] New dependencies were added with `uv add` (latest resolved, not hand-pinned) and `uv.lock` is committed.
-      </content>
-      </invoke>
