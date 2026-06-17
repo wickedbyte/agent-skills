@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - best-practices-rust — opinionated idiomatic-Rust style guide targeting Rust 1.96 / edition 2024 (illegal states
   unrepresentable, borrow-by-default, `Result`/`?`, `thiserror`/`anyhow`, small traits + generics, clippy-clean,
   scoped `unsafe`), with 10 reference files.
+- nestjs-api — playbook for building well-structured, strictly-typed, thoroughly-tested REST/RPC APIs in NestJS 11 on
+  the Fastify adapter, from an OpenAPI contract (project layout with a Nest-free domain core, Zod boundary validation,
+  the resource-action colon-command routing pattern, event-sourced command/projection persistence, `LISTEN/NOTIFY`
+  SSE, OAuth 2.0 / OIDC resource-server auth, a single error envelope, and emitted-≡-canonical + Schemathesis contract
+  testing); builds on best-practices-typescript, with 12 reference files.
 
 ### Changed
 
