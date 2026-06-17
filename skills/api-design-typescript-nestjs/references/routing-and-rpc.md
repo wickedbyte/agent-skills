@@ -6,7 +6,7 @@ file covers both, and the one routing trap that every implementation must handle
 
 ## Decide the style before you wire routes
 
-The path layout depends on which API style the surface follows; confirm it first (see *Decide the API Style First* in
+The path layout depends on which API style the surface follows; confirm it first (see _Decide the API Style First_ in
 SKILL.md), and if the contract does not encode one and you are greenfield, **ask the user**:
 
 1. **Pure REST** — resources and uniform verbs only (`PATCH /users/{id}`); no action endpoints.
@@ -248,8 +248,8 @@ Keep the version out of the path (`/api/v1/tasks` forks resource identifiers and
 negotiate it: read the requested version from the `Accept` header (`application/vnd.acme.task.v2+json`) and echo the
 chosen representation in the response `Content-Type`, or read a dedicated version header (`Acme-Version: 2024-11-01`). In
 Nest, `@Headers("accept")` (or a small interceptor that sets the response `Content-Type`) gives you the negotiated
-media type without per-route plumbing. Default to **not** versioning until a breaking change forces it — see *Version
-With Media Types or Headers* in SKILL.md.
+media type without per-route plumbing. Default to **not** versioning until a breaking change forces it — see _Version
+With Media Types or Headers_ in SKILL.md.
 
 ## Projects and meta
 

@@ -1,6 +1,6 @@
 # Persistence: pgx + sqlc + goose
 
-**Greenfield default.** If the project already has a datastore, use it and skip this — see *Adopt, Don't Impose* in SKILL.md.
+**Greenfield default.** If the project already has a datastore, use it and skip this — see _Adopt, Don't Impose_ in SKILL.md.
 
 The store is an adapter: it translates domain types to and from Postgres and never leaks `pgx` types or raw SQL errors
 upward. Stack: `pgx/v5` for the driver and pool, `sqlc` to generate type-safe query code from SQL, `goose` for

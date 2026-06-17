@@ -55,7 +55,7 @@ them from `NewRouter`. Keeps `NewRouter` a readable table of contents and the ha
 
 ## Decide the API style before wiring routes
 
-Confirm the convention with the user before routing (see *Decide the API Style First* in SKILL.md). Four styles:
+Confirm the convention with the user before routing (see _Decide the API Style First_ in SKILL.md). Four styles:
 
 1. **Pure REST** — only resources and HTTP verbs; no action endpoints (`PATCH /users/:id`).
 2. **Pure RPC** — every operation is a named procedure (`POST /resetUserPassword`); resources secondary or absent.
@@ -199,7 +199,7 @@ When a breaking change finally forces a version, negotiate it on the content typ
 `Accept: application/vnd.acme.user.v2+json`, pick the representation, and echo the chosen value back in
 `Content-Type` (`c.Negotiate` or a manual `c.GetHeader("Accept")` switch dispatches to the right serializer). A
 dated/integer version header (`Acme-Version: 2024-11-01`) is a lighter alternative. Default to **not versioning** —
-add optional fields compatibly for as long as you can. See *Version With Media Types or Headers* in SKILL.md.
+add optional fields compatibly for as long as you can. See _Version With Media Types or Headers_ in SKILL.md.
 
 The router-vs-spec route-coverage test that proves these routes match the OpenAPI operations lives in
 `openapi-contract.md`.

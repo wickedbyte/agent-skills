@@ -1,6 +1,6 @@
 # Persistence (async SQLAlchemy + asyncpg)
 
-**Greenfield default.** If the project already has a datastore, use it and skip this — see *Adopt, Don't Impose* in
+**Greenfield default.** If the project already has a datastore, use it and skip this — see _Adopt, Don't Impose_ in
 SKILL.md.
 
 The persistence layer is async end-to-end: an async engine, async sessions, transactional writes, and optimistic

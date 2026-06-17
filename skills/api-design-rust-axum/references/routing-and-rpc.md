@@ -3,7 +3,7 @@
 ## Confirm the API style before routing
 
 The route layout depends on which convention the API follows. Confirm it with the user (or the OpenAPI contract)
-before writing routes — see *Decide the API Style First* in SKILL.md. The four styles:
+before writing routes — see _Decide the API Style First_ in SKILL.md. The four styles:
 
 1. **Pure REST** — resources and uniform verbs only; no action endpoints.
 2. **Pure RPC** — every operation is a named procedure (`POST /resetUserPassword`).

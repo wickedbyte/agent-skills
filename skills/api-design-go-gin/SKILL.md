@@ -65,7 +65,7 @@ this skill's defaults on a working project is a failure mode, not thoroughness.
   guidance here applies only when there is no datastore yet. The architecture (a pure core behind a store
   seam) holds regardless of engine; the engine choice is the project's, not the skill's.
 - **Structure is a target, not a teardown.** The layering (pure domain core ← store ← HTTP edge) is the
-  default for new work and a direction to refactor *toward*, but adapt it to the directory conventions the
+  default for new work and a direction to refactor _toward_, but adapt it to the directory conventions the
   project already uses. Do not restructure a working codebase to match the diagrams here.
 - **Run the project's toolchain, not your own.** Detect and use the project's existing package manager and
   task runner. Go projects converge on the `go` toolchain, but honor an existing `Makefile`/`Taskfile`,
@@ -95,21 +95,21 @@ go list -m -u all                            # show available upgrades
 ## The Dependency Set (pull current versions of each)
 
 A deliberately small tree — lean on the standard library; add a dependency only when it earns its place. This is the
-**greenfield default**; in an existing project use the dependencies it already has (see *Adopt, Don't Impose*).
+**greenfield default**; in an existing project use the dependencies it already has (see _Adopt, Don't Impose_).
 
-| Concern                | Module (no version — `go get …@latest`)             | Why this one                                                                            |
-| ---------------------- | --------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| HTTP router/framework  | `github.com/gin-gonic/gin`                          | Fast httprouter core, middleware, binding. Idiomatic, ubiquitous, low variance.         |
-| Postgres driver + pool | `github.com/jackc/pgx/v5` (`/pgxpool`, `/pgconn`)   | Native protocol, `LISTEN/NOTIFY`, typed errors, connection pool. No `database/sql` tax. |
-| Type-safe queries      | `github.com/sqlc-dev/sqlc` (tool)                   | Generates Go from SQL — compile-checked queries, no ORM, no runtime reflection.         |
-| Migrations             | `github.com/pressly/goose/v3`                       | Versioned SQL migrations; embeddable; sqlc can read the schema straight from them.      |
-| Validation             | `github.com/go-playground/validator/v10`            | Gin's binding validator; struct-tag field rules. (Plus manual decode for strict specs.) |
-| IDs                    | `github.com/oklog/ulid/v2`                          | Sortable, URL-safe, time-ordered IDs; great as SSE/stream cursors.                      |
-| JWT verification       | `github.com/golang-jwt/jwt/v5`                      | Standard JWT parsing/validation with algorithm allow-listing.                           |
-| JWKS key resolution    | `github.com/MicahParks/keyfunc/v3`                  | Fetches + caches + rotates the authorization server's public keys for `jwt.Parse`.      |
-| Logging                | `log/slog` (stdlib)                                 | Structured JSON logs, no dependency.                                                    |
-| Tests                  | `github.com/stretchr/testify` + `net/http/httptest` | Assertions + in-process HTTP. Add `testcontainers-go/modules/postgres` for real DB.     |
-| Lint / format          | `mvdan.cc/gofumpt` + `golangci-lint` v2 (tools)     | Stricter-than-gofmt formatting + an aggregated linter gate.                             |
+| Concern                 | Module (no version — `go get …@latest`)                       | Why this one                                                                                              |
+| ----------------------- | ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| HTTP router/framework   | `github.com/gin-gonic/gin`                                    | Fast httprouter core, middleware, binding. Idiomatic, ubiquitous, low variance.                           |
+| Postgres driver + pool  | `github.com/jackc/pgx/v5` (`/pgxpool`, `/pgconn`)             | Native protocol, `LISTEN/NOTIFY`, typed errors, connection pool. No `database/sql` tax.                   |
+| Type-safe queries       | `github.com/sqlc-dev/sqlc` (tool)                             | Generates Go from SQL — compile-checked queries, no ORM, no runtime reflection.                           |
+| Migrations              | `github.com/pressly/goose/v3`                                 | Versioned SQL migrations; embeddable; sqlc can read the schema straight from them.                        |
+| Validation              | `github.com/go-playground/validator/v10`                      | Gin's binding validator; struct-tag field rules. (Plus manual decode for strict specs.)                   |
+| IDs                     | `github.com/oklog/ulid/v2`                                    | Sortable, URL-safe, time-ordered IDs; great as SSE/stream cursors.                                        |
+| JWT verification        | `github.com/golang-jwt/jwt/v5`                                | Standard JWT parsing/validation with algorithm allow-listing.                                             |
+| JWKS key resolution     | `github.com/MicahParks/keyfunc/v3`                            | Fetches + caches + rotates the authorization server's public keys for `jwt.Parse`.                        |
+| Logging                 | `log/slog` (stdlib)                                           | Structured JSON logs, no dependency.                                                                      |
+| Tests                   | `github.com/stretchr/testify` + `net/http/httptest`           | Assertions + in-process HTTP. Add `testcontainers-go/modules/postgres` for real DB.                       |
+| Lint / format           | `mvdan.cc/gofumpt` + `golangci-lint` v2 (tools)               | Stricter-than-gofmt formatting + an aggregated linter gate.                                               |
 | SSE at scale (optional) | A GRIP proxy — **Pushpin** (self-hosted) or **Fastly Fanout** | Holds the long-lived connections so the app stays stateless. In-process `LISTEN/NOTIFY` is PoC-tier only. |
 
 Config is **stdlib only** (`os.Getenv` with defaults) — don't pull a config framework for a dozen env vars.
@@ -170,7 +170,7 @@ generate` the typed `store/db`. (`references/persistence.md`.)
    function that satisfies it. No HTTP, no DB. This is where the real logic lives. (`references/domain-core.md`;
    `references/persistence.md` covers the domain↔store seam.)
 4. **Confirm the API style (see SKILL.md).** Decide REST / RPC / mixed / split and confirm with the user before
-   wiring routes — it shapes every path. (See *Decide the API Style First*; `references/routing-and-rpc.md`.)
+   wiring routes — it shapes every path. (See _Decide the API Style First_; `references/routing-and-rpc.md`.)
 5. **REST handlers + DTOs + error envelope.** Bind requests, call the core, map results and errors to status codes.
    (`references/routing-and-rpc.md`, `references/validation.md`, `references/errors.md`.)
 6. **RPC custom methods.** Wire the `POST /resource/{id}:action` colon-dispatch. (`references/routing-and-rpc.md`.)
@@ -339,7 +339,7 @@ events out to per-connection buffered channels (drop-on-slow-consumer); each `GE
 `WHERE id > Last-Event-ID` then goes live, de-duplicating on the sortable ULID cursor. Every stream emits a `: keep-alive`
 heartbeat at least every **30 seconds** — mandatory, not optional. The in-process `LISTEN/NOTIFY` fan-out is the
 **PoC / under-100-concurrent-streams tier**; for production or anything user-facing at scale, front the endpoint with a
-GRIP proxy (**Pushpin** or **Fastly Fanout**) and have the app *publish* events rather than hold connections. See
+GRIP proxy (**Pushpin** or **Fastly Fanout**) and have the app _publish_ events rather than hold connections. See
 **`references/sse.md`**.
 
 ## Testing & Contract Conformance
@@ -367,39 +367,39 @@ A step is done only when the whole gate exits zero.
 
 ## Quick Triage Table
 
-| Situation                                           | Do this                                                                                |
-| --------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| Given an OpenAPI spec to implement                  | Embed + serve it verbatim; coverage-test routes; fuzz with Schemathesis                |
-| Which routing convention to use                     | Confirm REST / RPC / mixed / split with the user; default is mixed (resource + colon actions) |
-| Custom method `POST /x/{id}:action`                 | One `POST /x/:id` route → `splitCommand` on last colon → dispatch                      |
+| Situation                                           | Do this                                                                                                                         |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Given an OpenAPI spec to implement                  | Embed + serve it verbatim; coverage-test routes; fuzz with Schemathesis                                                         |
+| Which routing convention to use                     | Confirm REST / RPC / mixed / split with the user; default is mixed (resource + colon actions)                                   |
+| Custom method `POST /x/{id}:action`                 | One `POST /x/:id` route → `splitCommand` on last colon → dispatch                                                               |
 | Live updates to clients                             | SSE; in-process LISTEN/NOTIFY for PoC/<100 conns, a GRIP proxy (Pushpin/Fastly Fanout) for production; 30s keep-alive mandatory |
-| Health/readiness probes                             | `/readyz` + `/livez` open (shallow); `/healthz` detailed report behind the auth gate    |
-| `additionalProperties: false` in a schema           | `json.Decoder` + `DisallowUnknownFields`, not bare `ShouldBindJSON`                    |
-| PATCH that must tell "field absent" from "set null" | Tri-state type (`Set bool; Value *T`) with a custom `UnmarshalJSON`                    |
-| Concurrent updates to one resource                  | Optimistic concurrency: `UNIQUE(stream,version)`; `23505` → `409`                      |
-| Protect routes with OAuth 2.0                       | Resource-server JWT+JWKS middleware; allow-list algs; check `iss`/`aud`/`exp`/scope    |
-| Need real DB in tests                               | `testcontainers-go/modules/postgres`, one container per test, `t.Cleanup`              |
-| Wire/DB error must reach the client                 | Translate to a typed/sentinel error; `handleError` maps it; never leak raw strings     |
-| Adding a dependency                                 | `go get …@latest && go mod tidy`; verify the resolved version + major in release notes |
+| Health/readiness probes                             | `/readyz` + `/livez` open (shallow); `/healthz` detailed report behind the auth gate                                            |
+| `additionalProperties: false` in a schema           | `json.Decoder` + `DisallowUnknownFields`, not bare `ShouldBindJSON`                                                             |
+| PATCH that must tell "field absent" from "set null" | Tri-state type (`Set bool; Value *T`) with a custom `UnmarshalJSON`                                                             |
+| Concurrent updates to one resource                  | Optimistic concurrency: `UNIQUE(stream,version)`; `23505` → `409`                                                               |
+| Protect routes with OAuth 2.0                       | Resource-server JWT+JWKS middleware; allow-list algs; check `iss`/`aud`/`exp`/scope                                             |
+| Need real DB in tests                               | `testcontainers-go/modules/postgres`, one container per test, `t.Cleanup`                                                       |
+| Wire/DB error must reach the client                 | Translate to a typed/sentinel error; `handleError` maps it; never leak raw strings                                              |
+| Adding a dependency                                 | `go get …@latest && go mod tidy`; verify the resolved version + major in release notes                                          |
 
 ## Common Mistakes (and the fix)
 
-| Mistake                                                           | Fix                                                                        |
-| ----------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| `gin.Default()` in production                                     | `gin.New()` + explicit `Recovery` (and your own logging) middleware        |
-| Business logic in handlers (`pgx`/`gin` types in decision code)   | Pure `domain` package; handlers only bind, call, and map                   |
-| Hand-maintaining OpenAPI via swag annotations                     | Serve the canonical spec; prove agreement with a route-coverage test       |
-| `ShouldBindJSON` for a strict `additionalProperties:false` schema | `DisallowUnknownFields` decoder; reject unknown keys with 422              |
-| `*string` for a PATCH field, losing "absent vs null"              | Tri-state `{Set bool; Value *T}` type                                      |
-| Accepting any JWT alg (or `none`); skipping `aud`                 | `jwt.WithValidMethods([...])` allow-list; `WithIssuer`/`WithAudience`      |
-| Returning `err.Error()` to the client                             | Map to a typed code + safe message; log the real error server-side         |
-| `time.Now()` inside domain logic                                  | Inject a clock (`now time.Time` param / `App.Now`) for deterministic tests |
-| Pinning versions / committing a stale `go.sum`                    | `go get …@latest` + `go mod tidy`; track dev tools as `tool` directives    |
-| Ignoring `Body.Close()` / leaking the LISTEN conn into the pool   | `bodyclose` lint; a standalone `pgx.Conn` for `LISTEN`, outside the pool   |
-| Forgetting `-race`; testing against a mock DB only                | `go test -race`; integration tests on a real Postgres via testcontainers   |
-| Version in the URL path (`/api/v1/...`)                           | Version via media type (`Accept: application/vnd...+json`) or a version header; never the path |
+| Mistake                                                           | Fix                                                                                                |
+| ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `gin.Default()` in production                                     | `gin.New()` + explicit `Recovery` (and your own logging) middleware                                |
+| Business logic in handlers (`pgx`/`gin` types in decision code)   | Pure `domain` package; handlers only bind, call, and map                                           |
+| Hand-maintaining OpenAPI via swag annotations                     | Serve the canonical spec; prove agreement with a route-coverage test                               |
+| `ShouldBindJSON` for a strict `additionalProperties:false` schema | `DisallowUnknownFields` decoder; reject unknown keys with 422                                      |
+| `*string` for a PATCH field, losing "absent vs null"              | Tri-state `{Set bool; Value *T}` type                                                              |
+| Accepting any JWT alg (or `none`); skipping `aud`                 | `jwt.WithValidMethods([...])` allow-list; `WithIssuer`/`WithAudience`                              |
+| Returning `err.Error()` to the client                             | Map to a typed code + safe message; log the real error server-side                                 |
+| `time.Now()` inside domain logic                                  | Inject a clock (`now time.Time` param / `App.Now`) for deterministic tests                         |
+| Pinning versions / committing a stale `go.sum`                    | `go get …@latest` + `go mod tidy`; track dev tools as `tool` directives                            |
+| Ignoring `Body.Close()` / leaking the LISTEN conn into the pool   | `bodyclose` lint; a standalone `pgx.Conn` for `LISTEN`, outside the pool                           |
+| Forgetting `-race`; testing against a mock DB only                | `go test -race`; integration tests on a real Postgres via testcontainers                           |
+| Version in the URL path (`/api/v1/...`)                           | Version via media type (`Accept: application/vnd...+json`) or a version header; never the path     |
 | Fanning out SSE from the app at scale                             | Front it with a GRIP proxy (Pushpin/Fastly Fanout); the app publishes, the proxy holds connections |
-| Optional/absent SSE keep-alive                                    | Mandatory heartbeat every 30s                                              |
+| Optional/absent SSE keep-alive                                    | Mandatory heartbeat every 30s                                                                      |
 
 ## Reference Files
 

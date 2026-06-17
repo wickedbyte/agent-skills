@@ -1,6 +1,6 @@
 # Persistence with `sqlx`
 
-**Greenfield default.** If the project already has a datastore, use it and skip this — see *Adopt, Don't Impose*
+**Greenfield default.** If the project already has a datastore, use it and skip this — see _Adopt, Don't Impose_
 in SKILL.md.
 
 `sqlx` gives async, compile-time-checked SQL without an ORM: you write SQL, and the `query!`/`query_as!` macros

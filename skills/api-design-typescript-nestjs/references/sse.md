@@ -6,7 +6,7 @@ low-concurrency internal tool — roughly **under 100 concurrent streams on a si
 **not** scale: open connections pin memory and file descriptors to specific instances, every deploy drops
 every stream, and horizontal scaling multiplies the `LISTEN` load on Postgres. **For production, or anything
 user-facing at scale, do not fan out from the app.** Put a GRIP-capable realtime proxy in front — **Pushpin**
-(self-hosted, open source) or **Fastly Fanout** — and have the app *publish* events to it while holding no
+(self-hosted, open source) or **Fastly Fanout** — and have the app _publish_ events to it while holding no
 long-lived client connections itself. The proxy owns the open connections, so the service scales and deploys
 like any stateless app. Treat the design below as the PoC tier and the proxy as the blessed production path.
 
@@ -21,8 +21,8 @@ The event stream is a single `GET /events` endpoint returning `text/event-stream
 which expects an RxJS `Observable<MessageEvent>`. The transport is Postgres `LISTEN/NOTIFY`: on every event append the
 writer issues `NOTIFY`, a dedicated listening connection fans those out to a `Subject`, and each subscriber gets a
 per-connection stream that **backfills** from the events table (for `Last-Event-ID` resume) and then goes **live**.
-This is the **PoC / low-concurrency tier** (under ~100 concurrent streams on one instance); see *Production: publish to
-a GRIP proxy* below for the path that scales.
+This is the **PoC / low-concurrency tier** (under ~100 concurrent streams on one instance); see _Production: publish to
+a GRIP proxy_ below for the path that scales.
 
 ## The controller is trivial
 
@@ -197,7 +197,7 @@ proxy in front — **Pushpin** (self-hosted, open source) or **Fastly Fanout** �
 - **The proxy owns the open connections.** Clients connect to the proxy; the proxy forwards the initial `GET /events`
   request to the app over its control plane.
 - **The app responds with GRIP hold instructions, then returns.** Instead of streaming, the handler answers with
-  `Grip-Hold: stream` and a `Grip-Channel: events` header (and any backfill body), then the request *completes* — the app
+  `Grip-Hold: stream` and a `Grip-Channel: events` header (and any backfill body), then the request _completes_ — the app
   holds no socket. The proxy keeps the client connection open, subscribed to that channel.
 - **The app publishes events to the proxy's publish endpoint.** When a domain event appends, publish the SSE frame to the
   proxy (Pushpin's `POST /publish/` HTTP control API, or the Fanout publish API) on the `events` channel; the proxy fans
@@ -206,7 +206,7 @@ proxy in front — **Pushpin** (self-hosted, open source) or **Fastly Fanout** �
 - **Configure the proxy's keep-alive.** Set the proxy to emit the `: keep-alive` heartbeat at least every 30 s (e.g.
   Pushpin's `keep-alive` field on the hold) so the mandatory-heartbeat rule still holds when the proxy owns the socket.
 
-The `LISTEN/NOTIFY` → domain-event pipeline can still feed the publisher; what changes is that the app *publishes* each
+The `LISTEN/NOTIFY` → domain-event pipeline can still feed the publisher; what changes is that the app _publishes_ each
 frame to the GRIP proxy instead of pushing it down a held `@Sse()` connection. Name the mechanism in code and config —
 GRIP, `Grip-Hold`, `Grip-Channel`, the publish endpoint — so the deployment is explicit.
 

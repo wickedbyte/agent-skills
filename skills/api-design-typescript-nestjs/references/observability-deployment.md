@@ -57,7 +57,9 @@ export class HealthController {
 
     // Open, shallow — load balancer / readiness gate.
     @Get("readyz")
-    async readyz(@Res({ passthrough: true }) res: FastifyReply): Promise<{ status: string }> {
+    async readyz(
+        @Res({ passthrough: true }) res: FastifyReply,
+    ): Promise<{ status: string }> {
         const ok = await this.store.ping(); // SELECT 1
         if (!ok) {
             res.status(503);

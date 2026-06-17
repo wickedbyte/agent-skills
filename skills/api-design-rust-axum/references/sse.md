@@ -6,7 +6,7 @@ low-concurrency internal tool — roughly **under 100 concurrent streams on a si
 **not** scale: open connections pin memory and file descriptors to specific instances, every deploy drops
 every stream, and horizontal scaling multiplies the `LISTEN` load on Postgres. **For production, or anything
 user-facing at scale, do not fan out from the app.** Put a GRIP-capable realtime proxy in front — **Pushpin**
-(self-hosted, open source) or **Fastly Fanout** — and have the app *publish* events to it while holding no
+(self-hosted, open source) or **Fastly Fanout** — and have the app _publish_ events to it while holding no
 long-lived client connections itself. The proxy owns the open connections, so the service scales and deploys
 like any stateless app. Treat the design below as the PoC tier and the proxy as the blessed production path.
 

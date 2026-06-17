@@ -70,7 +70,7 @@ this skill's defaults on a working project is a failure mode, not thoroughness.
   guidance here applies only when there is no datastore yet. The architecture (a pure core behind a store
   seam) holds regardless of engine; the engine choice is the project's, not the skill's.
 - **Structure is a target, not a teardown.** The layering (pure domain core ← store ← HTTP edge) is the
-  default for new work and a direction to refactor *toward*, but adapt it to the directory conventions the
+  default for new work and a direction to refactor _toward_, but adapt it to the directory conventions the
   project already uses. Do not restructure a working codebase to match the diagrams here.
 - **Run the project's toolchain, not your own.** Detect and use the project's existing package manager and
   task runner. Detect the package manager from the lockfile and use it — `npm`/`yarn`/`bun`/`pnpm`
@@ -322,20 +322,20 @@ not.** Run `<pkg>@latest` through the project's package manager (the lockfile de
 `package-lock.json`/`yarn.lock`/`bun.lockb`/`pnpm-lock.yaml`; `pnpm` is the greenfield default) — e.g.
 `pnpm add <pkg>@latest` (or `-D`) — and verify.
 
-| Concern             | Package(s)                                                                         | Role                                                          |
-| ------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| Framework + adapter | `@nestjs/common` `@nestjs/core` `@nestjs/platform-fastify` `fastify`               | DI, modules, HTTP via Fastify                                 |
-| Reflection          | `reflect-metadata`                                                                 | Decorator metadata for DI (import once in `main.ts`)          |
-| Validation          | `zod`                                                                              | One schema → runtime check + static type at the boundary      |
-| DB driver + queries | `pg` + `kysely`                                                                    | Postgres client + typed SQL builder (no ORM identity map)     |
-| Streaming           | `rxjs` (+ a GRIP proxy — Pushpin / Fastly Fanout — at scale)                        | `Observable` feed for `@Sse()` (PoC tier); proxy holds connections in production |
-| Auth                | `jose`                                                                             | JWKS fetch + JWT verify in the guard                          |
-| IDs                 | `ulidx`                                                                            | Sortable, prefixed, opaque IDs                                |
-| Logging             | `nestjs-pino` + `pino`                                                             | Structured JSON logs to stdout                                |
-| Config              | `zod` (reused)                                                                     | Validate `process.env`                                        |
-| Tests               | `vitest` `@nestjs/testing` `supertest` `@testcontainers/postgresql` `unplugin-swc` | Runner, Nest test harness, HTTP, real DB, decorator transform |
-| Lint/format         | `eslint` `typescript-eslint` `@eslint/js` `prettier`                               | Flat-config lint (ban `any`) + formatter                      |
-| Language            | `typescript` `@types/node`                                                         | Strict TS, ESM (`nodenext`)                                   |
+| Concern             | Package(s)                                                                         | Role                                                                             |
+| ------------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| Framework + adapter | `@nestjs/common` `@nestjs/core` `@nestjs/platform-fastify` `fastify`               | DI, modules, HTTP via Fastify                                                    |
+| Reflection          | `reflect-metadata`                                                                 | Decorator metadata for DI (import once in `main.ts`)                             |
+| Validation          | `zod`                                                                              | One schema → runtime check + static type at the boundary                         |
+| DB driver + queries | `pg` + `kysely`                                                                    | Postgres client + typed SQL builder (no ORM identity map)                        |
+| Streaming           | `rxjs` (+ a GRIP proxy — Pushpin / Fastly Fanout — at scale)                       | `Observable` feed for `@Sse()` (PoC tier); proxy holds connections in production |
+| Auth                | `jose`                                                                             | JWKS fetch + JWT verify in the guard                                             |
+| IDs                 | `ulidx`                                                                            | Sortable, prefixed, opaque IDs                                                   |
+| Logging             | `nestjs-pino` + `pino`                                                             | Structured JSON logs to stdout                                                   |
+| Config              | `zod` (reused)                                                                     | Validate `process.env`                                                           |
+| Tests               | `vitest` `@nestjs/testing` `supertest` `@testcontainers/postgresql` `unplugin-swc` | Runner, Nest test harness, HTTP, real DB, decorator transform                    |
+| Lint/format         | `eslint` `typescript-eslint` `@eslint/js` `prettier`                               | Flat-config lint (ban `any`) + formatter                                         |
+| Language            | `typescript` `@types/node`                                                         | Strict TS, ESM (`nodenext`)                                                      |
 
 Swap deliberately: `class-validator` + `class-transformer` instead of Zod (decorator DTOs, first-class
 `@nestjs/swagger`), Drizzle/Prisma instead of Kysely, the Express adapter instead of Fastify. The skill's patterns hold
@@ -343,27 +343,27 @@ across those choices; `references/toolchain.md` covers the trade-offs.
 
 ## Quick Triage Table
 
-| Situation                                          | Default choice                                                                   |
-| -------------------------------------------------- | -------------------------------------------------------------------------------- |
-| HTTP adapter                                       | Fastify (`@nestjs/platform-fastify`)                                             |
-| Which routing convention to use                    | Confirm REST / RPC / mixed / split with the user; default is mixed (resource + colon actions) |
-| Request validation                                 | Zod `z.strictObject` via a `ZodValidationPipe`                                   |
-| `POST /res/{id}:command` routing                   | One `@Post(":id")` catch route + split-on-last-colon dispatch                    |
-| Where domain rules live                            | Pure `domain/` functions — never import `@nestjs/*`                              |
-| Surfacing an error                                 | `throw` a named domain error; map it in one global `@Catch()` filter             |
-| Concurrency / lost-update protection               | `UNIQUE (stream_id, version)` → 409 on stale append                              |
-| Read-your-writes after a command                   | Update projection in the **same transaction** as the append                      |
-| Date-only field (`YYYY-MM-DD`)                     | Keep as a string; override `pg` type parser `1082` to return raw text            |
+| Situation                                          | Default choice                                                                                                                    |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| HTTP adapter                                       | Fastify (`@nestjs/platform-fastify`)                                                                                              |
+| Which routing convention to use                    | Confirm REST / RPC / mixed / split with the user; default is mixed (resource + colon actions)                                     |
+| Request validation                                 | Zod `z.strictObject` via a `ZodValidationPipe`                                                                                    |
+| `POST /res/{id}:command` routing                   | One `@Post(":id")` catch route + split-on-last-colon dispatch                                                                     |
+| Where domain rules live                            | Pure `domain/` functions — never import `@nestjs/*`                                                                               |
+| Surfacing an error                                 | `throw` a named domain error; map it in one global `@Catch()` filter                                                              |
+| Concurrency / lost-update protection               | `UNIQUE (stream_id, version)` → 409 on stale append                                                                               |
+| Read-your-writes after a command                   | Update projection in the **same transaction** as the append                                                                       |
+| Date-only field (`YYYY-MM-DD`)                     | Keep as a string; override `pg` type parser `1082` to return raw text                                                             |
 | Live updates to clients                            | SSE; in-process `LISTEN/NOTIFY` for PoC/<100 conns, a GRIP proxy (Pushpin/Fastly Fanout) for production; 30s keep-alive mandatory |
-| SSE transport (PoC tier)                           | Postgres `LISTEN/NOTIFY` → RxJS `Subject` → `@Sse()`; resume via `Last-Event-ID` |
-| Auth                                               | OIDC resource-server guard with `jose`, gated by `AUTH_REQUIRED` (default off)   |
-| Meta endpoints open without a token                | `/readyz`, `/livez`, `/openapi.json` open; `/healthz` is gated behind auth       |
-| OpenAPI doc when the contract is externally frozen | Embed canonical + serve verbatim + drift check                                   |
-| OpenAPI doc when you own the contract              | Generate from schemas (`@nestjs/swagger`) and assert ≡                           |
-| Testing the store / migrations                     | Real Postgres via Testcontainers, not a mock                                     |
-| Testing an endpoint                                | `supertest` against the booted Fastify app                                       |
-| Config access                                      | Zod-validated `AppConfig` injected by token                                      |
-| ID scheme                                          | Prefixed ULID (`task_01J…`); pick one scheme and keep it                         |
+| SSE transport (PoC tier)                           | Postgres `LISTEN/NOTIFY` → RxJS `Subject` → `@Sse()`; resume via `Last-Event-ID`                                                  |
+| Auth                                               | OIDC resource-server guard with `jose`, gated by `AUTH_REQUIRED` (default off)                                                    |
+| Meta endpoints open without a token                | `/readyz`, `/livez`, `/openapi.json` open; `/healthz` is gated behind auth                                                        |
+| OpenAPI doc when the contract is externally frozen | Embed canonical + serve verbatim + drift check                                                                                    |
+| OpenAPI doc when you own the contract              | Generate from schemas (`@nestjs/swagger`) and assert ≡                                                                            |
+| Testing the store / migrations                     | Real Postgres via Testcontainers, not a mock                                                                                      |
+| Testing an endpoint                                | `supertest` against the booted Fastify app                                                                                        |
+| Config access                                      | Zod-validated `AppConfig` injected by token                                                                                       |
+| ID scheme                                          | Prefixed ULID (`task_01J…`); pick one scheme and keep it                                                                          |
 
 ## Reference Files
 
@@ -403,25 +403,25 @@ Read the relevant file when SKILL.md leaves a judgment call open:
 
 ## Common Mistakes (and the fix)
 
-| Mistake                                                                        | Fix                                                                                          |
-| ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
-| Declaring `@Post(":id\\:complete")` and fighting the router over the colon     | One `@Post(":id")` catch route + `splitColonCommand` on the last `:` + dispatch              |
-| Splitting the command on the **first** colon                                   | Split on the **last** `:` so IDs that contain colons survive; test both cases                |
-| Business logic inside controllers (or `@nestjs/*` imported in `domain/`)       | Controllers only marshal HTTP; rules live in pure `domain/` functions                        |
-| Trusting `@Body()` / `@Query()` as a typed DTO without a runtime schema        | Validate every input through a Zod schema pipe; the type is a _claim_ until checked          |
-| `z.object(...)` for a request body                                             | `z.strictObject(...)` so unknown keys are rejected (matches `additionalProperties: false`)   |
-| Per-controller `try/catch` translating errors to responses                     | Throw named domain errors; map them once in the global `@Catch()` filter                     |
-| `enableCors`/`ValidationPipe`/version pins copied from a blog without checking | Resolve latest, read the changelog, verify against the running API                           |
-| Reading `pg` `date` columns as `Date` (shifts `YYYY-MM-DD` across TZs)         | Override the `date` type parser (OID `1082`) to return the raw string                        |
-| Updating the projection in a _separate_ transaction from the append            | Append + project in **one** transaction so reads-your-writes (and the SSE notify) are atomic |
-| Reading `Date.now()` inside the domain core                                    | Pass `now: Date` in from the edge; the core stays pure and deterministic                     |
-| Tuning `@nestjs/swagger` for hours to match a frozen external contract         | Embed the canonical document and serve it verbatim; add a drift check                        |
-| Mocking Postgres in store/migration tests                                      | Use a real Postgres via Testcontainers; mocks hide constraint/concurrency bugs               |
-| Leaving `AUTH_REQUIRED` un-scaffolded "until later"                            | Ship the inert guard now; flipping the env is the only change needed to enforce              |
-| Forgetting `reflect-metadata` / SWC decorator metadata in tests                | Import `reflect-metadata` in `main.ts`; configure `unplugin-swc` so Vitest emits DI metadata |
-| Version in the URL path (`/api/v1/...`)                                        | Version via media type (`Accept: application/vnd...+json`) or a version header; never the path |
+| Mistake                                                                        | Fix                                                                                                |
+| ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| Declaring `@Post(":id\\:complete")` and fighting the router over the colon     | One `@Post(":id")` catch route + `splitColonCommand` on the last `:` + dispatch                    |
+| Splitting the command on the **first** colon                                   | Split on the **last** `:` so IDs that contain colons survive; test both cases                      |
+| Business logic inside controllers (or `@nestjs/*` imported in `domain/`)       | Controllers only marshal HTTP; rules live in pure `domain/` functions                              |
+| Trusting `@Body()` / `@Query()` as a typed DTO without a runtime schema        | Validate every input through a Zod schema pipe; the type is a _claim_ until checked                |
+| `z.object(...)` for a request body                                             | `z.strictObject(...)` so unknown keys are rejected (matches `additionalProperties: false`)         |
+| Per-controller `try/catch` translating errors to responses                     | Throw named domain errors; map them once in the global `@Catch()` filter                           |
+| `enableCors`/`ValidationPipe`/version pins copied from a blog without checking | Resolve latest, read the changelog, verify against the running API                                 |
+| Reading `pg` `date` columns as `Date` (shifts `YYYY-MM-DD` across TZs)         | Override the `date` type parser (OID `1082`) to return the raw string                              |
+| Updating the projection in a _separate_ transaction from the append            | Append + project in **one** transaction so reads-your-writes (and the SSE notify) are atomic       |
+| Reading `Date.now()` inside the domain core                                    | Pass `now: Date` in from the edge; the core stays pure and deterministic                           |
+| Tuning `@nestjs/swagger` for hours to match a frozen external contract         | Embed the canonical document and serve it verbatim; add a drift check                              |
+| Mocking Postgres in store/migration tests                                      | Use a real Postgres via Testcontainers; mocks hide constraint/concurrency bugs                     |
+| Leaving `AUTH_REQUIRED` un-scaffolded "until later"                            | Ship the inert guard now; flipping the env is the only change needed to enforce                    |
+| Forgetting `reflect-metadata` / SWC decorator metadata in tests                | Import `reflect-metadata` in `main.ts`; configure `unplugin-swc` so Vitest emits DI metadata       |
+| Version in the URL path (`/api/v1/...`)                                        | Version via media type (`Accept: application/vnd...+json`) or a version header; never the path     |
 | Fanning out SSE from the app at scale                                          | Front it with a GRIP proxy (Pushpin/Fastly Fanout); the app publishes, the proxy holds connections |
-| Optional/absent SSE keep-alive                                                 | Mandatory heartbeat every 30s                                                                |
+| Optional/absent SSE keep-alive                                                 | Mandatory heartbeat every 30s                                                                      |
 
 ## Pre-Commit Self-Check
 

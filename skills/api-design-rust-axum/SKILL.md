@@ -77,7 +77,7 @@ this skill's defaults on a working project is a failure mode, not thoroughness.
   guidance here applies only when there is no datastore yet. The architecture (a pure core behind a store
   seam) holds regardless of engine; the engine choice is the project's, not the skill's.
 - **Structure is a target, not a teardown.** The layering (pure domain core ← store ← HTTP edge) is the
-  default for new work and a direction to refactor *toward*, but adapt it to the directory conventions the
+  default for new work and a direction to refactor _toward_, but adapt it to the directory conventions the
   project already uses. Do not restructure a working codebase to match the diagrams here.
 - **Run the project's toolchain, not your own.** Detect and use the project's existing package manager and
   task runner. Rust converges on `cargo`, but honor an existing `just`/`Makefile`, `cargo-make`, or
@@ -90,20 +90,20 @@ this skill's defaults on a working project is a failure mode, not thoroughness.
 
 Names and roles are the durable advice; **resolve current versions with `cargo add`**. A typical REST/RPC service:
 
-| Concern              | Crate(s)                                                   | Notes                                                                             |
-| -------------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| HTTP framework       | `axum` (+ `tower`, `tower-http`)                           | Tower middleware ecosystem; `tower-http` for trace/CORS/compression/timeout.      |
-| Async runtime        | `tokio` (`features = ["full"]` in the binary)              | One runtime, chosen by the binary — keep it out of the pure core.                 |
-| Database             | `sqlx` (`postgres`, `macros`, `migrate`, `chrono`, `json`) | Compile-time-checked `query!`/`query_as!`; offline `.sqlx` cache for CI.          |
-| Serialization        | `serde` + `serde_json`                                     | Strict DTOs: `rename_all = "camelCase"`, `deny_unknown_fields`.                   |
-| Errors               | `thiserror` (domain/store enums) → one app `IntoResponse`  | `anyhow` only for the binary's bootstrap, never on the request path.              |
-| Auth (resource srv.) | `jsonwebtoken` + a JWKS source                             | Validate signature + `exp`/`iss`/`aud`; cache keys by `kid`.                      |
-| IDs                  | `ulid` (or `uuid`) wrapped in newtypes                     | Sortable ids that double as the event/stream cursor; newtypes prevent id mixups.  |
-| Time                 | `chrono` (`features = ["serde"]`)                          | RFC3339 timestamps vs `NaiveDate` date-only — keep the two distinct in the types. |
-| Tracing              | `tracing` + `tracing-subscriber` (`json`, `env-filter`)    | Structured stdout logs; level via `RUST_LOG`.                                     |
-| Validation           | field checks in the core, or `garde`/`validator`           | Prefer the decider; reach for a crate only for large declarative rule sets.       |
-| OpenAPI              | serve the canonical doc, or derive with `utoipa`           | See `references/openapi-contract.md` for the trade-off.                           |
-| Test (HTTP)          | `tower` (`util`) + `http-body-util` (dev-deps)             | `ServiceExt::oneshot` drives the router in-process — no live port.                |
+| Concern              | Crate(s)                                                   | Notes                                                                                           |
+| -------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| HTTP framework       | `axum` (+ `tower`, `tower-http`)                           | Tower middleware ecosystem; `tower-http` for trace/CORS/compression/timeout.                    |
+| Async runtime        | `tokio` (`features = ["full"]` in the binary)              | One runtime, chosen by the binary — keep it out of the pure core.                               |
+| Database             | `sqlx` (`postgres`, `macros`, `migrate`, `chrono`, `json`) | Compile-time-checked `query!`/`query_as!`; offline `.sqlx` cache for CI.                        |
+| Serialization        | `serde` + `serde_json`                                     | Strict DTOs: `rename_all = "camelCase"`, `deny_unknown_fields`.                                 |
+| Errors               | `thiserror` (domain/store enums) → one app `IntoResponse`  | `anyhow` only for the binary's bootstrap, never on the request path.                            |
+| Auth (resource srv.) | `jsonwebtoken` + a JWKS source                             | Validate signature + `exp`/`iss`/`aud`; cache keys by `kid`.                                    |
+| IDs                  | `ulid` (or `uuid`) wrapped in newtypes                     | Sortable ids that double as the event/stream cursor; newtypes prevent id mixups.                |
+| Time                 | `chrono` (`features = ["serde"]`)                          | RFC3339 timestamps vs `NaiveDate` date-only — keep the two distinct in the types.               |
+| Tracing              | `tracing` + `tracing-subscriber` (`json`, `env-filter`)    | Structured stdout logs; level via `RUST_LOG`.                                                   |
+| Validation           | field checks in the core, or `garde`/`validator`           | Prefer the decider; reach for a crate only for large declarative rule sets.                     |
+| OpenAPI              | serve the canonical doc, or derive with `utoipa`           | See `references/openapi-contract.md` for the trade-off.                                         |
+| Test (HTTP)          | `tower` (`util`) + `http-body-util` (dev-deps)             | `ServiceExt::oneshot` drives the router in-process — no live port.                              |
 | SSE / realtime       | `axum::response::sse` (PoC); a GRIP proxy at scale         | In-process `LISTEN/NOTIFY` for PoC/<100 conns; front with Pushpin/Fastly Fanout for production. |
 
 `[lints]`/profile/toolchain setup, feature-flag discipline, and the full `Cargo.toml` are in
@@ -162,7 +162,7 @@ loop — finish and verify a layer before starting the next, so a contract misre
    No I/O — this is where most of the logic and nearly all the tests live. (`references/domain-core.md`.)
 5. **Persistence.** `load → fold`, and `commit` = append + project (+ notify) in **one transaction**; map the
    unique-violation to a typed conflict for optimistic concurrency. (`references/persistence.md`.)
-6. **Confirm the API style** (REST / RPC / mixed / split — see *Decide the API Style First* in SKILL.md) before
+6. **Confirm the API style** (REST / RPC / mixed / split — see _Decide the API Style First_ in SKILL.md) before
    laying out routes; follow the contract if it encodes one, otherwise ask the user.
 7. **HTTP edge.** Router, DTOs + parsing, REST handlers, then the RPC colon-dispatcher; wire `AppError: IntoResponse`.
    (`references/routing-and-rpc.md`, `references/validation.md`, `references/errors.md`.)
@@ -214,24 +214,24 @@ treatment in `references/routing-and-rpc.md`.
 
 ## Quick Triage Table
 
-| Situation                                 | Default choice                                                                         |
-| ----------------------------------------- | -------------------------------------------------------------------------------------- |
-| Framework choice                          | `axum` + `tower-http`, unless the project already standardizes on `actix-web`          |
-| Reading a JSON request body               | Take `Bytes`, `serde_json::from_slice` → a `deny_unknown_fields` DTO → 422 on failure  |
-| `additionalProperties: false`             | `#[serde(deny_unknown_fields)]` on the request DTO                                     |
-| PATCH "absent vs explicit null vs value"  | `Option<Option<T>>` with a `double_option` deserializer + `#[serde(default)]`          |
-| Which routing convention to use           | Confirm REST / RPC / mixed / split with the user; default is mixed (resource + colon actions) |
-| `POST /res/{id}:command` RPC              | Capture-and-dispatch: one `{id}` route, `rsplit_once(':')`, `match` command            |
-| Turning any failure into an HTTP response | One `AppError` enum + `impl IntoResponse`; `From` for domain/store errors; `?`         |
-| A SQL query                               | `sqlx::query!`/`query_as!` (compile-time checked) + committed `.sqlx` offline cache    |
-| Two writes that must both land            | One `pool.begin()` transaction; commit at the end                                      |
-| Concurrent-update safety                  | Optimistic: a unique `(stream, version)` → catch unique-violation → typed conflict→409 |
-| Protecting routes                         | OIDC bearer middleware validating JWT vs JWKS; `/readyz` + `/livez` + `/openapi.json` open, `/healthz` gated; env toggle |
+| Situation                                 | Default choice                                                                                                                    |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Framework choice                          | `axum` + `tower-http`, unless the project already standardizes on `actix-web`                                                     |
+| Reading a JSON request body               | Take `Bytes`, `serde_json::from_slice` → a `deny_unknown_fields` DTO → 422 on failure                                             |
+| `additionalProperties: false`             | `#[serde(deny_unknown_fields)]` on the request DTO                                                                                |
+| PATCH "absent vs explicit null vs value"  | `Option<Option<T>>` with a `double_option` deserializer + `#[serde(default)]`                                                     |
+| Which routing convention to use           | Confirm REST / RPC / mixed / split with the user; default is mixed (resource + colon actions)                                     |
+| `POST /res/{id}:command` RPC              | Capture-and-dispatch: one `{id}` route, `rsplit_once(':')`, `match` command                                                       |
+| Turning any failure into an HTTP response | One `AppError` enum + `impl IntoResponse`; `From` for domain/store errors; `?`                                                    |
+| A SQL query                               | `sqlx::query!`/`query_as!` (compile-time checked) + committed `.sqlx` offline cache                                               |
+| Two writes that must both land            | One `pool.begin()` transaction; commit at the end                                                                                 |
+| Concurrent-update safety                  | Optimistic: a unique `(stream, version)` → catch unique-violation → typed conflict→409                                            |
+| Protecting routes                         | OIDC bearer middleware validating JWT vs JWKS; `/readyz` + `/livez` + `/openapi.json` open, `/healthz` gated; env toggle          |
 | Live updates to clients                   | SSE; in-process `LISTEN/NOTIFY` for PoC/<100 conns, a GRIP proxy (Pushpin/Fastly Fanout) for production; 30s keep-alive mandatory |
-| Sortable id that is also a stream cursor  | `ULID` newtype (monotonic generator for event ids)                                     |
-| Serving the OpenAPI doc                   | Embed & serve the canonical file; assert route coverage in a test (see ref)            |
-| Testing a handler without a socket        | `app.oneshot(Request)` via `tower::ServiceExt`; `#[sqlx::test]` for a real DB          |
-| Deterministic timestamps in tests         | Inject a `Clock` enum (`System` / `Fixed`) through `AppState`                          |
+| Sortable id that is also a stream cursor  | `ULID` newtype (monotonic generator for event ids)                                                                                |
+| Serving the OpenAPI doc                   | Embed & serve the canonical file; assert route coverage in a test (see ref)                                                       |
+| Testing a handler without a socket        | `app.oneshot(Request)` via `tower::ServiceExt`; `#[sqlx::test]` for a real DB                                                     |
+| Deterministic timestamps in tests         | Inject a `Clock` enum (`System` / `Fixed`) through `AppState`                                                                     |
 
 ## Reference Files
 
@@ -267,26 +267,26 @@ Read the relevant file when the SKILL.md guidance leaves a judgment call open:
 
 ## Common Mistakes (and the fix)
 
-| Mistake                                                                  | Fix                                                                            |
-| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
-| Business logic inside `async` handlers, tangled with `axum`/`sqlx`       | Pure `decide`/service core; handler = parse → delegate → map; test the core    |
-| `Json<T>` extractor for requests, getting Axum's plain-text 422          | Take `Bytes`, parse yourself, map errors to the contract's envelope            |
-| DTOs without `deny_unknown_fields`                                       | Add it — that _is_ `additionalProperties:false`; unknown fields → 422          |
-| Conflating "field absent" with "field set to null" in PATCH              | `Option<Option<T>>` + a `double_option` deserializer                           |
-| Per-handler `(StatusCode, Json)` tuples; status logic scattered          | One `AppError: IntoResponse`; every handler returns `Result<_, AppError>`      |
-| Routing `/{id}:command` as a literal and fighting the path capture       | Capture the whole segment, `rsplit_once(':')`, dispatch; test the split        |
-| Version in the URL path (`/api/v1/...`)                                  | Version via media type (`Accept: application/vnd...+json`) or a version header; never the path |
-| Runtime-built SQL strings / unchecked queries                            | `query!`/`query_as!` checked against the DB; commit the `.sqlx` offline cache  |
-| Append and projection in separate transactions                           | One `tx`: append → project (→ notify) → commit; read-your-writes holds         |
-| `SELECT … version` then `UPDATE` to guard concurrency                    | Optimistic: unique `(stream, version)`; catch the unique-violation → 409       |
-| Fetching JWKS over HTTP on every request (or baking keys into the build) | Cache decoding keys by `kid`; refresh out of band; config-provided in tests    |
-| One SSE query at connect, missing events past the page / on reconnect    | Page the backfill to the live edge, then dedupe the live stream by id cursor   |
+| Mistake                                                                  | Fix                                                                                                |
+| ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| Business logic inside `async` handlers, tangled with `axum`/`sqlx`       | Pure `decide`/service core; handler = parse → delegate → map; test the core                        |
+| `Json<T>` extractor for requests, getting Axum's plain-text 422          | Take `Bytes`, parse yourself, map errors to the contract's envelope                                |
+| DTOs without `deny_unknown_fields`                                       | Add it — that _is_ `additionalProperties:false`; unknown fields → 422                              |
+| Conflating "field absent" with "field set to null" in PATCH              | `Option<Option<T>>` + a `double_option` deserializer                                               |
+| Per-handler `(StatusCode, Json)` tuples; status logic scattered          | One `AppError: IntoResponse`; every handler returns `Result<_, AppError>`                          |
+| Routing `/{id}:command` as a literal and fighting the path capture       | Capture the whole segment, `rsplit_once(':')`, dispatch; test the split                            |
+| Version in the URL path (`/api/v1/...`)                                  | Version via media type (`Accept: application/vnd...+json`) or a version header; never the path     |
+| Runtime-built SQL strings / unchecked queries                            | `query!`/`query_as!` checked against the DB; commit the `.sqlx` offline cache                      |
+| Append and projection in separate transactions                           | One `tx`: append → project (→ notify) → commit; read-your-writes holds                             |
+| `SELECT … version` then `UPDATE` to guard concurrency                    | Optimistic: unique `(stream, version)`; catch the unique-violation → 409                           |
+| Fetching JWKS over HTTP on every request (or baking keys into the build) | Cache decoding keys by `kid`; refresh out of band; config-provided in tests                        |
+| One SSE query at connect, missing events past the page / on reconnect    | Page the backfill to the live edge, then dedupe the live stream by id cursor                       |
 | Fanning out SSE from the app at scale                                    | Front it with a GRIP proxy (Pushpin/Fastly Fanout); the app publishes, the proxy holds connections |
-| Optional/absent SSE keep-alive                                           | Mandatory heartbeat every 30s                                                  |
-| `utoipa` doc silently drifting from the canonical OpenAPI                | Serve the canonical doc and assert route coverage, or test emitted ≡ canonical |
-| `Utc::now()` straight in handlers, making tests time-dependent           | Inject a `Clock` (`System`/`Fixed`) via `AppState`                             |
-| Spawning a server + real socket in tests                                 | `router.oneshot(request)` in-process; `#[sqlx::test]` for an isolated DB       |
-| Pinning crate versions from memory / this skill                          | `cargo add` the current release; verify the API on docs.rs; `cargo update`     |
+| Optional/absent SSE keep-alive                                           | Mandatory heartbeat every 30s                                                                      |
+| `utoipa` doc silently drifting from the canonical OpenAPI                | Serve the canonical doc and assert route coverage, or test emitted ≡ canonical                     |
+| `Utc::now()` straight in handlers, making tests time-dependent           | Inject a `Clock` (`System`/`Fixed`) via `AppState`                                                 |
+| Spawning a server + real socket in tests                                 | `router.oneshot(request)` in-process; `#[sqlx::test]` for an isolated DB                           |
+| Pinning crate versions from memory / this skill                          | `cargo add` the current release; verify the API on docs.rs; `cargo update`                         |
 
 ## Pre-Flight Self-Check
 

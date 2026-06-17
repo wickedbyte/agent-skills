@@ -74,7 +74,7 @@ this skill's defaults on a working project is a failure mode, not thoroughness.
   guidance here applies only when there is no datastore yet. The architecture (a pure core behind a store
   seam) holds regardless of engine; the engine choice is the project's, not the skill's.
 - **Structure is a target, not a teardown.** The layering (pure domain core ← store ← HTTP edge) is the
-  default for new work and a direction to refactor *toward*, but adapt it to the directory conventions the
+  default for new work and a direction to refactor _toward_, but adapt it to the directory conventions the
   project already uses. Do not restructure a working codebase to match the diagrams here.
 - **Run the project's toolchain, not your own.** Detect and use the project's existing package manager and
   task runner. If the project uses `uv`, run every tool through it (`uv run ruff`, `uv run pytest`) rather
@@ -89,24 +89,24 @@ this skill's defaults on a working project is a failure mode, not thoroughness.
 Add these with `uv add` / `uv add --dev`; the lockfile records exact versions. Reach for a library only when the
 feature needs it — don't install auth or SSE deps for a service that has neither.
 
-| Concern                | Library                                     | Notes                                                         |
-| ---------------------- | ------------------------------------------- | ------------------------------------------------------------- |
+| Concern                | Library                                     | Notes                                                                                                                                     |
+| ---------------------- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | Package/venv manager   | **uv**                                      | Greenfield default. In a `uv` project every command is `uv run …`; in a Poetry/pip-tools/pipenv/conda project, use that project's runner. |
-| Web framework          | **fastapi**                                 | Emits OpenAPI **3.1** natively.                               |
-| ASGI server            | **uvicorn[standard]**                       | `uvicorn`/`uvloop`/`httptools`; add Granian only if measured. |
-| Validation / models    | **pydantic** (v2)                           | `ConfigDict(extra="forbid")` → `additionalProperties:false`.  |
-| Settings               | **pydantic-settings**                       | Env-sourced `Settings`; typed, validated, no `os.environ`.    |
-| DB toolkit             | **sqlalchemy[asyncio]** (2.0)               | Core `text()` is enough for an event store; ORM is optional.  |
-| Async driver           | **asyncpg**                                 | Postgres; also exposes `LISTEN/NOTIFY` for SSE.               |
-| Migrations             | **alembic**                                 | Async env; run out of band, never per worker.                 |
-| Server-sent events     | **sse-starlette**                           | `EventSourceResponse(ping=30)`; pair with asyncpg `add_listener` for PoC, a GRIP proxy (Pushpin/Fastly Fanout) at scale. |
-| Auth (resource server) | **pyjwt[crypto]**                           | `PyJWKClient` validates RS256/ES256 against the issuer JWKS.  |
-| IDs                    | **python-ulid**                             | Sortable, prefixed string ids (`task_01J…`).                  |
-| Logging                | **structlog** (or stdlib `logging` + JSON)  | Structured, to stdout. Do **not** unit-test logging.          |
-| Tests                  | **pytest**, **pytest-asyncio**, **httpx**   | `httpx.ASGITransport` drives the app in-process, no socket.   |
-| Contract fuzzing       | **schemathesis**                            | Property-based testing generated from the OpenAPI schema.     |
-| Lint + format          | **ruff**                                    | `ruff check` + `ruff format`.                                 |
-| Types                  | **mypy** (`--strict`) or **pyright**/**ty** | Strict mode is the gate — it is your real correctness signal. |
+| Web framework          | **fastapi**                                 | Emits OpenAPI **3.1** natively.                                                                                                           |
+| ASGI server            | **uvicorn[standard]**                       | `uvicorn`/`uvloop`/`httptools`; add Granian only if measured.                                                                             |
+| Validation / models    | **pydantic** (v2)                           | `ConfigDict(extra="forbid")` → `additionalProperties:false`.                                                                              |
+| Settings               | **pydantic-settings**                       | Env-sourced `Settings`; typed, validated, no `os.environ`.                                                                                |
+| DB toolkit             | **sqlalchemy[asyncio]** (2.0)               | Core `text()` is enough for an event store; ORM is optional.                                                                              |
+| Async driver           | **asyncpg**                                 | Postgres; also exposes `LISTEN/NOTIFY` for SSE.                                                                                           |
+| Migrations             | **alembic**                                 | Async env; run out of band, never per worker.                                                                                             |
+| Server-sent events     | **sse-starlette**                           | `EventSourceResponse(ping=30)`; pair with asyncpg `add_listener` for PoC, a GRIP proxy (Pushpin/Fastly Fanout) at scale.                  |
+| Auth (resource server) | **pyjwt[crypto]**                           | `PyJWKClient` validates RS256/ES256 against the issuer JWKS.                                                                              |
+| IDs                    | **python-ulid**                             | Sortable, prefixed string ids (`task_01J…`).                                                                                              |
+| Logging                | **structlog** (or stdlib `logging` + JSON)  | Structured, to stdout. Do **not** unit-test logging.                                                                                      |
+| Tests                  | **pytest**, **pytest-asyncio**, **httpx**   | `httpx.ASGITransport` drives the app in-process, no socket.                                                                               |
+| Contract fuzzing       | **schemathesis**                            | Property-based testing generated from the OpenAPI schema.                                                                                 |
+| Lint + format          | **ruff**                                    | `ruff check` + `ruff format`.                                                                                                             |
+| Types                  | **mypy** (`--strict`) or **pyright**/**ty** | Strict mode is the gate — it is your real correctness signal.                                                                             |
 
 ## Project layout (`src/` layout, one `pyproject.toml`)
 
@@ -203,7 +203,7 @@ long as you can, and version only the representations that actually break.
     listener fans events to per-subscriber `asyncio.Queue`s through `EventSourceResponse`; `Last-Event-ID` backfills
     then goes live. That in-process fan-out holds for a PoC or low-concurrency tool (**under ~100 concurrent streams on
     one instance**); for production or anything user-facing at scale, front it with a GRIP proxy (**Pushpin** or
-    **Fastly Fanout**) — the app *publishes*, the proxy holds connections. A **30-second keep-alive is mandatory** either
+    **Fastly Fanout**) — the app _publishes_, the proxy holds connections. A **30-second keep-alive is mandatory** either
     way (`EventSourceResponse(..., ping=30)`). See `references/sse.md`.
 12. **OAuth 2.0 as a gated dependency.** Validate the bearer JWT against the issuer's JWKS (`PyJWKClient`), enforce only
     when `AUTH_REQUIRED=true`, keep the open meta set (`/readyz`, `/livez`, `/openapi.json`) always reachable. `/healthz`
@@ -241,45 +241,45 @@ HTTP exists.
 
 ## Quick triage table
 
-| Situation                                          | Default                                                                        |
-| -------------------------------------------------- | ------------------------------------------------------------------------------ |
-| Building the app object                            | `create_app(...)` factory + `@asynccontextmanager` `lifespan`; inject deps     |
-| Reading configuration                              | `Settings(BaseSettings)` from `pydantic-settings`; never raw `os.environ`      |
-| Providing a shared resource to handlers            | `Depends(provider)` + an `Annotated[T, Depends(...)]` alias                    |
-| A request body                                     | Pydantic model, `ConfigDict(extra="forbid")`, `alias` for camelCase            |
-| Returning a resource                               | Serialize the domain object to a `dict`/`response_model` at the edge           |
-| A resource-action command                          | `POST /res/{id}:action`, `Path(pattern=r"^[^:/]+$")`, registered before `{id}` |
-| Signaling a domain failure                         | Raise a specific domain exception; a handler maps it to the envelope           |
-| FastAPI's built-in 422 doesn't match your envelope | `@app.exception_handler(RequestValidationError)` rewrites the body             |
-| Talking to Postgres                                | async engine + `async_sessionmaker(expire_on_commit=False)`; `text()` is fine  |
-| A write that must be atomic                        | `async with session.begin():` — append + project in one transaction            |
-| Concurrent-update protection                       | `UNIQUE(stream, version)`; map `IntegrityError` → 409 conflict                 |
-| Which routing convention to use                    | Confirm REST / RPC / mixed / split with the user; default is mixed (resource + colon actions) |
+| Situation                                          | Default                                                                                                                         |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Building the app object                            | `create_app(...)` factory + `@asynccontextmanager` `lifespan`; inject deps                                                      |
+| Reading configuration                              | `Settings(BaseSettings)` from `pydantic-settings`; never raw `os.environ`                                                       |
+| Providing a shared resource to handlers            | `Depends(provider)` + an `Annotated[T, Depends(...)]` alias                                                                     |
+| A request body                                     | Pydantic model, `ConfigDict(extra="forbid")`, `alias` for camelCase                                                             |
+| Returning a resource                               | Serialize the domain object to a `dict`/`response_model` at the edge                                                            |
+| A resource-action command                          | `POST /res/{id}:action`, `Path(pattern=r"^[^:/]+$")`, registered before `{id}`                                                  |
+| Signaling a domain failure                         | Raise a specific domain exception; a handler maps it to the envelope                                                            |
+| FastAPI's built-in 422 doesn't match your envelope | `@app.exception_handler(RequestValidationError)` rewrites the body                                                              |
+| Talking to Postgres                                | async engine + `async_sessionmaker(expire_on_commit=False)`; `text()` is fine                                                   |
+| A write that must be atomic                        | `async with session.begin():` — append + project in one transaction                                                             |
+| Concurrent-update protection                       | `UNIQUE(stream, version)`; map `IntegrityError` → 409 conflict                                                                  |
+| Which routing convention to use                    | Confirm REST / RPC / mixed / split with the user; default is mixed (resource + colon actions)                                   |
 | Live updates to clients                            | SSE; in-process LISTEN/NOTIFY for PoC/<100 conns, a GRIP proxy (Pushpin/Fastly Fanout) for production; 30s keep-alive mandatory |
-| Protecting endpoints                               | Resource-server JWT dependency, gated by `AUTH_REQUIRED`; `/readyz`+`/livez`+`/openapi.json` open, `/healthz` gated |
-| Testing an endpoint                                | `httpx.AsyncClient(transport=ASGITransport(app=app))` — in-process, no socket  |
-| Proving the wire contract                          | `app.openapi() == canonical` test **and** Schemathesis fuzzing                 |
+| Protecting endpoints                               | Resource-server JWT dependency, gated by `AUTH_REQUIRED`; `/readyz`+`/livez`+`/openapi.json` open, `/healthz` gated             |
+| Testing an endpoint                                | `httpx.AsyncClient(transport=ASGITransport(app=app))` — in-process, no socket                                                   |
+| Proving the wire contract                          | `app.openapi() == canonical` test **and** Schemathesis fuzzing                                                                  |
 
 ## Common mistakes (and the fix)
 
-| Mistake                                                          | Fix                                                                         |
-| ---------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| Business logic inside route handlers                             | Push it into a pure domain core; handlers only translate                    |
-| `@app.on_event("startup")`                                       | `lifespan=@asynccontextmanager` passed to `FastAPI(...)`                    |
-| Module-level engine/client globals constructed at import         | Build them in the factory/lifespan; inject via `Depends`                    |
-| `/tasks/{task_id}` swallowing `01J…:complete`                    | Literal colon route + `Path(pattern=r"^[^:/]+$")`; register before `{id}`   |
-| Accepting unknown body fields silently                           | `model_config = ConfigDict(extra="forbid")`                                 |
-| Shipping FastAPI's raw 422 body when the contract defines one    | `RequestValidationError` handler that emits your envelope (keep status 422) |
-| `def` handler doing async DB work / blocking call in `async def` | `async def` for I/O handlers; blocking deps as plain `def` (threadpool)     |
-| Sync `psycopg`/`requests` on the event loop                      | `asyncpg` + async SQLAlchemy; `httpx.AsyncClient` for outbound              |
-| Lazy-loading an ORM relationship in a response                   | Eager-load everything the response needs in the query (async forbids lazy)  |
-| Separate transactions for the write and the projection           | One `async with session.begin()` around both                                |
-| `pip install`, `requirements.txt`, `os.environ[...]`             | `uv add`, `uv.lock`, `pydantic-settings`                                    |
-| Pydantic models leaking into the domain core                     | Convert to a domain command at the edge (`to_command()`)                    |
-| Only testing happy paths over HTTP                               | Unit-test the domain exhaustively; reserve HTTP tests for the translation   |
-| Version in the URL path (`/api/v1/...`)                          | Version via media type (`Accept: application/vnd...+json`) or a version header; never the path |
+| Mistake                                                          | Fix                                                                                                |
+| ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Business logic inside route handlers                             | Push it into a pure domain core; handlers only translate                                           |
+| `@app.on_event("startup")`                                       | `lifespan=@asynccontextmanager` passed to `FastAPI(...)`                                           |
+| Module-level engine/client globals constructed at import         | Build them in the factory/lifespan; inject via `Depends`                                           |
+| `/tasks/{task_id}` swallowing `01J…:complete`                    | Literal colon route + `Path(pattern=r"^[^:/]+$")`; register before `{id}`                          |
+| Accepting unknown body fields silently                           | `model_config = ConfigDict(extra="forbid")`                                                        |
+| Shipping FastAPI's raw 422 body when the contract defines one    | `RequestValidationError` handler that emits your envelope (keep status 422)                        |
+| `def` handler doing async DB work / blocking call in `async def` | `async def` for I/O handlers; blocking deps as plain `def` (threadpool)                            |
+| Sync `psycopg`/`requests` on the event loop                      | `asyncpg` + async SQLAlchemy; `httpx.AsyncClient` for outbound                                     |
+| Lazy-loading an ORM relationship in a response                   | Eager-load everything the response needs in the query (async forbids lazy)                         |
+| Separate transactions for the write and the projection           | One `async with session.begin()` around both                                                       |
+| `pip install`, `requirements.txt`, `os.environ[...]`             | `uv add`, `uv.lock`, `pydantic-settings`                                                           |
+| Pydantic models leaking into the domain core                     | Convert to a domain command at the edge (`to_command()`)                                           |
+| Only testing happy paths over HTTP                               | Unit-test the domain exhaustively; reserve HTTP tests for the translation                          |
+| Version in the URL path (`/api/v1/...`)                          | Version via media type (`Accept: application/vnd...+json`) or a version header; never the path     |
 | Fanning out SSE from the app at scale                            | Front it with a GRIP proxy (Pushpin/Fastly Fanout); the app publishes, the proxy holds connections |
-| Optional/absent SSE keep-alive                                   | Mandatory heartbeat every 30s (`EventSourceResponse(..., ping=30)`)         |
+| Optional/absent SSE keep-alive                                   | Mandatory heartbeat every 30s (`EventSourceResponse(..., ping=30)`)                                |
 
 ## Reference files
 

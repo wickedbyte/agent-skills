@@ -100,7 +100,7 @@ What each part defends:
 - **`issuer` and `audience` checks.** Verifying the signature is not enough — a valid token from a _different_ audience
   or issuer must be rejected, or you accept tokens minted for another service. Pass them whenever configured.
 - **Meta paths open.** `/readyz`, `/livez`, and `/openapi.json` must answer without a token (probes, doc tooling). Match
-  on the path with the query string stripped. **`/healthz` is deliberately *not* in this set** — it is a gated route
+  on the path with the query string stripped. **`/healthz` is deliberately _not_ in this set** — it is a gated route
   whose richer report (DB + build/version) would leak internal topology, so it sits behind the auth gate like any other
   authenticated endpoint (see `references/observability-deployment.md`).
 - **`UnauthorizedException` → 401.** The global filter renders it through the envelope (`codeForStatus(401)`); a bad or
