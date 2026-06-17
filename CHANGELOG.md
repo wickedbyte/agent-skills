@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - best-practices-rust — opinionated idiomatic-Rust style guide targeting Rust 1.96 / edition 2024 (illegal states
   unrepresentable, borrow-by-default, `Result`/`?`, `thiserror`/`anyhow`, small traits + generics, clippy-clean,
   scoped `unsafe`), with 10 reference files.
+- fastapi-rest-api — build playbook for well-structured, fully-typed, contract-tested REST/RPC APIs in Python with
+  FastAPI (layered domain/store/api structure, app factory + `lifespan`, `pydantic-settings`, `Depends` DI, Pydantic
+  boundary validation with `extra="forbid"`, the resource-action colon-route RPC pattern, a single error envelope with
+  the 422 reconciliation, async SQLAlchemy 2.0 + asyncpg with optimistic concurrency, SSE over `LISTEN/NOTIFY`,
+  OAuth 2.0 / OIDC resource-server JWT auth, and the httpx-ASGITransport + Schemathesis contract test pyramid). Layers
+  on best-practices-python; does not pin dependency versions. With 5 reference files.
 
 ### Changed
 
